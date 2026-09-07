@@ -1,0 +1,41 @@
+[package]
+name = "emulate-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[features]
+# The user-mode NAT layer in `hostnet`, pulled in by the hosts that need it.
+hostnet = ["dep:smoltcp", "dep:heapless"]
+# `hostnet::testing::FakeSubstrate` is a test double, not part of the shipping
+# surface. The self-referential dev-dependency below turns it on for this
+# crate's own tests (unit, integration, and doctests) and for nothing else.
+testing = ["hostnet"]
+
+[dependencies]
+rustc_apfloat = "0.2.3"
+# Only needed to fill smoltcp's `DhcpRepr::dns_servers`, which is a heapless Vec.
+heapless = { version = "0.8", default-features = false, optional = true }
+
+# Pinned to 0.12 (see docs/networking.md). `default-features = false` is
+# load-bearing: smoltcp's defaults pull in `phy-raw_socket` / `phy-tuntap_interface`
+# on unix, which would break the wasm32-unknown-unknown build.
+[dependencies.smoltcp]
+version = "0.12"
+default-features = false
+optional = true
+features = [
+    "alloc",
+    "medium-ip",
+    "medium-ethernet",
+    "proto-ipv4",
+    "proto-dhcpv4",
+    "socket-tcp",
+]
+
+[dev-dependencies]
+emulate-core = { path = ".", features = ["testing"] }
+
+[[bench]]
+name = "core"
+harness = false

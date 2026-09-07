@@ -1,0 +1,40 @@
+#!/bin/sh
+# Installed as /usr/share/udhcpc/default.script: the hook BusyBox's udhcpc calls
+# per lease event. Without it udhcpc takes a lease and configures nothing. The
+# canonical BusyBox script, trimmed to what this guest has.
+[ -z "$1" ] && echo "usage: $0 <deconfig|bound|renew|nak>" && exit 1
+
+RESOLV_CONF=/etc/resolv.conf
+[ -n "$broadcast" ] && BROADCAST="broadcast $broadcast"
+[ -n "$subnet" ] && NETMASK="netmask $subnet"
+
+case "$1" in
+    deconfig)
+        ifconfig "$interface" 0.0.0.0
+        ;;
+
+    renew|bound)
+        ifconfig "$interface" "$ip" $BROADCAST $NETMASK
+
+        if [ -n "$router" ]; then
+            while route del default gw 0.0.0.0 dev "$interface" 2>/dev/null; do
+                :
+            done
+            for i in $router; do
+                route add default gw "$i" dev "$interface"
+            done
+        fi
+
+        : > "$RESOLV_CONF"
+        [ -n "$domain" ] && echo "search $domain" >> "$RESOLV_CONF"
+        for i in $dns; do
+            echo "nameserver $i" >> "$RESOLV_CONF"
+        done
+        ;;
+
+    nak)
+        echo "dhcp: received NAK for $interface"
+        ;;
+esac
+
+exit 0

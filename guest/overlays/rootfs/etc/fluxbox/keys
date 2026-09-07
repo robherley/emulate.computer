@@ -1,0 +1,16 @@
+OnDesktop Mouse1 :HideMenus
+OnDesktop Mouse3 :RootMenu
+OnTitlebar Mouse1 :MacroCmd {Raise} {Focus} {ActivateTab}
+OnTitlebar Move1 :StartMoving
+OnTitlebar Double Mouse1 :Maximize
+OnTitlebar Mouse3 :WindowMenu
+OnWindowBorder Move1 :StartMoving
+OnLeftGrip Move1 :StartResizing bottomleft
+OnRightGrip Move1 :StartResizing bottomright
+OnWindow Mod1 Mouse1 :MacroCmd {Raise} {Focus} {StartMoving}
+OnWindow Mod1 Mouse3 :MacroCmd {Raise} {Focus} {StartResizing NearestCorner}
+Mod1 Tab :NextWindow {groups} (workspace=[current])
+Mod1 Shift Tab :PrevWindow {groups} (workspace=[current])
+Mod1 F1 :RootMenu
+Mod1 F4 :Close
+Mod1 F10 :Maximize

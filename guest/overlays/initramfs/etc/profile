@@ -1,0 +1,6 @@
+# Shell environment for the initramfs-only boot (root, ash, no /usr/local).
+# The persistent root has its own /etc/profile; see rootfs/profile.
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PS1='root@emulate.computer:\w \$ '
+cat /etc/motd 2>/dev/null
+uname -a

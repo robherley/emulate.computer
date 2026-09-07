@@ -1,0 +1,12 @@
+# ACT4 DUT configuration for emulate.computer's current unprivileged RV64GC
+# implementation. The architectural and Sail configuration remain pinned to
+# the upstream spike-RVI20U64 profile; that profile matches emulate's RAM,
+# NS16550 UART, CLINT, and tohost platform addresses.
+name: emulate-rv64gc
+compiler_exe: riscv64-unknown-elf-gcc
+objdump_exe: riscv64-unknown-elf-objdump
+ref_model_exe: sail_riscv_sim
+udb_config: /act4/config/spike/spike-RVI20U64/spike-RVI20U64.yaml
+linker_script: /act4/config/spike/spike-RVI20U64/link.ld
+dut_include_dir: /act4/config/spike/spike-RVI20U64
+include_priv_tests: false

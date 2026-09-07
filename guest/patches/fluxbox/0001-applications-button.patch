@@ -1,0 +1,77 @@
+Use the favicon for the taskbar launcher and anchor its menu above the button.
+
+--- a/src/ToolFactory.cc
++++ b/src/ToolFactory.cc
+@@ -38,0 +39,6 @@
++#include "FbTk/Image.hh"
++#include "FbTk/PixmapWithMask.hh"
++#include "FbTk/SimpleCommand.hh"
++#include "FbMenu.hh"
++#include "FocusControl.hh"
++#include <memory>
+@@ -44,0 +51,59 @@
++class RootMenuButton: public FbTk::Button {
++public:
++    RootMenuButton(const FbTk::FbWindow &parent, BScreen &screen, int size):
++        FbTk::Button(parent, 0, 0, size, size), m_screen(screen),
++        m_icon(FbTk::Image::load("/etc/fluxbox/buttons/start.xpm", screen.screenNumber())) {
++        FbTk::RefCount<FbTk::Command<void> > command(
++            new FbTk::SimpleCommand<RootMenuButton>(*this, &RootMenuButton::showMenu));
++        setOnClick(command);
++    }
++
++    void clear() override {
++        FbTk::Button::clear();
++        drawIcon();
++    }
++
++    void exposeEvent(XExposeEvent &event) override {
++        FbTk::Button::exposeEvent(event);
++        drawIcon();
++    }
++
++private:
++    void drawIcon() {
++        if (!m_icon.get()) return;
++        const int x = (static_cast<int>(width()) - m_icon->width()) / 2;
++        const int y = (static_cast<int>(height()) - m_icon->height()) / 2;
++        GC context = XCreateGC(display(), window(), 0, 0);
++        XSetClipMask(display(), context, m_icon->mask().drawable());
++        XSetClipOrigin(display(), context, x, y);
++        copyArea(m_icon->pixmap().drawable(), context, 0, 0, x, y,
++                 m_icon->width(), m_icon->height());
++        XFreeGC(display(), context);
++    }
++
++    void showMenu() {
++        FbMenu &menu = m_screen.rootMenu();
++        if (menu.isVisible()) { menu.hide(); return; }
++        if (menu.reloadHelper()) menu.reloadHelper()->checkReload();
++        FbMenu::setWindow(FocusControl::focusedFbWindow());
++        int x, y;
++        Window child;
++        XTranslateCoordinates(display(), window(), m_screen.rootWindow().window(),
++                              0, 0, &x, &y, &child);
++        const int head = m_screen.getHead(x, y);
++        menu.setScreen(m_screen.getHeadX(head), m_screen.getHeadY(head),
++                       m_screen.getHeadWidth(head), m_screen.getHeadHeight(head));
++        menu.updateMenu();
++        const int border = 2 * menu.fbwindow().borderWidth();
++        const std::pair<int, int> position = m_screen.clampToHead(
++            head, x, y - menu.height() - border,
++            menu.width() + border, menu.height() + border);
++        menu.move(position.first, position.second);
++        menu.show();
++        menu.grabInputFocus();
++    }
++
++    BScreen &m_screen;
++    std::unique_ptr<FbTk::PixmapWithMask> m_icon;
++};
++
+@@ -98,0 +164,5 @@
++    } else if (name == "rootmenu") {
++        RootMenuButton *win = new RootMenuButton(parent, screen(), button_size);
++        item = new ButtonTool(win, ToolbarItem::SQUARE,
++                              dynamic_cast<ButtonTheme &>(*m_button_theme),
++                              screen().imageControl());

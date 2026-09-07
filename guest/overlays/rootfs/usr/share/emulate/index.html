@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Welcome to emulate.computer</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <style>
+    body { margin: 24px; background: #fafafa; color: #222; font-family: sans-serif; font-size: 14px; }
+    h1 { font-size: 24px; }
+    h1 img { vertical-align: middle; margin-right: 8px; }
+    h2 { font-size: 18px; margin-top: 24px; }
+    a { color: #0068d6; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; vertical-align: top; padding: 7px; border-bottom: 1px solid #ddd; }
+    code { font-family: monospace; }
+  </style>
+</head>
+<body>
+  <img src="favicon.png" width="32" height="32" alt="logo">
+  <h1>emulate.computer</h1>
+  <p>A small Linux computer running inside your web browser. The emulator is
+    written in Rust and compiled to WebAssembly.</p>
+
+  <h2>The computer</h2>
+  <p>The processor is a single-core, 64-bit <strong>RISC-V RV64GC</strong> CPU.
+    It supports integer arithmetic, multiplication and division, atomic operations,
+    single- and double-precision floating point, and compressed instructions,
+    plus selected bit-manipulation and cryptography extensions.</p>
+  <p>The guest runs Alpine Linux with 128 MiB of RAM and a 512 MiB disk.
+    Its desktop uses the Fluxbox window manager and the XLibre X server.</p>
+
+  <h2>Programs and utilities</h2>
+  <p>Open desktop apps from the Applications menu. Run the commands below in
+    the Console tab or a Terminal window.</p>
+  <table>
+    <tr><th>Program</th><th>Command</th><th>What it does</th></tr>
+    <tr><td>Python 3</td><td><code>python3</code></td><td>Interactive Python and scripts, with the standard library.</td></tr>
+    <tr><td>QuickJS</td><td><code>qjs</code></td><td>Run JavaScript in the terminal.</td></tr>
+    <tr><td>curl</td><td><code>curl https://example.com</code></td><td>Fetch web pages and APIs from the terminal.</td></tr>
+    <tr><td>Terminal</td><td><code>xterm</code></td><td>A shell window on the desktop.</td></tr>
+    <tr><td>Browser</td><td><code>dillo</code></td><td>A lightweight web browser.</td></tr>
+    <tr><td>Notepad</td><td><code>adie</code></td><td>A text editor, under Utilities.</td></tr>
+    <tr><td>Files</td><td><code>PathFinder</code></td><td>Browse files and preview images, under Utilities.</td></tr>
+    <tr><td>Calculator</td><td><code>xcalc</code></td><td>A desktop calculator.</td></tr>
+    <tr><td>Clock</td><td><code>xclock</code></td><td>An analog desktop clock.</td></tr>
+    <tr><td>Doom</td><td><code>doom</code></td><td>DoomGeneric with Freedoom: Phase 1. Arrow keys move/turn, F fires, Space opens doors, Esc opens the menu. No audio.</td></tr>
+    <tr><td>Solitaire</td><td><code>ace-solitaire</code></td><td>The classic card game.</td></tr>
+    <tr><td>Minesweeper</td><td><code>ace-minesweeper</code></td><td>Find the mines.</td></tr>
+    <tr><td>Tetris</td><td><code>xtris -s</code></td><td>A falling-block puzzle.</td></tr>
+  </table>
+
+  <h2>Source code</h2>
+  <p><a href="https://github.com/robherley/emulate.computer">github.com/robherley/emulate.computer</a></p>
+</body>
+</html>

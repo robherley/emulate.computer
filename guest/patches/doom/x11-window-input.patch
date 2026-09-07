@@ -1,0 +1,131 @@
+--- a/doomgeneric/doomgeneric_xlib.c
++++ b/doomgeneric/doomgeneric_xlib.c
+@@ -1,6 +1,7 @@
+ #include "doomkeys.h"
+ 
+ #include "doomgeneric.h"
++#include "i_system.h"
+ 
+ #include <ctype.h>
+ #include <stdio.h>
+@@ -18,6 +19,8 @@
+ static int s_Screen = 0;
+ static GC s_Gc = 0;
+ static XImage *s_Image = NULL;
++static Atom s_DeleteWindow;
++static unsigned char s_HeldKeys[256];
+ 
+ #define KEYQUEUE_SIZE 16
+ 
+@@ -47,10 +50,12 @@
+     case XK_Down:
+ 		key = KEY_DOWNARROW;
+ 		break;
++    case XK_f:
+     case XK_Control_L:
+     case XK_Control_R:
+ 		key = KEY_FIRE;
+ 		break;
++    case XK_e:
+     case XK_space:
+ 		key = KEY_USE;
+ 		break;
+@@ -58,7 +63,15 @@
+     case XK_Shift_R:
+ 		key = KEY_RSHIFT;
+ 		break;
++    case XK_Tab:
++        key = KEY_TAB;
++        break;
++    case XK_Alt_L:
++    case XK_Alt_R:
++        key = KEY_RALT;
++        break;
+ 	default:
++        if (key > 127) return 0;
+ 		key = tolower(key);
+ 		break;
+ 	}
+@@ -69,6 +82,8 @@
+ static void addKeyToQueue(int pressed, unsigned int keyCode)
+ {
+ 	unsigned char key = convertToDoomKey(keyCode);
++    if (!key || s_HeldKeys[key] == pressed) return;
++    s_HeldKeys[key] = pressed;
+ 
+ 	unsigned short keyData = (pressed << 8) | key;
+ 
+@@ -85,6 +100,10 @@
+ 
+     s_Display = XOpenDisplay(NULL);
+ 
++    if (!s_Display) {
++        fprintf(stderr, "Doom requires a running X display.\n");
++        exit(1);
++    }
+     s_Screen = DefaultScreen(s_Display);
+ 
+     int blackColor = BlackPixel(s_Display, s_Screen);
+@@ -99,8 +118,17 @@
+ 
+     s_Window = XCreateSimpleWindow(s_Display, DefaultRootWindow(s_Display), 0, 0, DOOMGENERIC_RESX, DOOMGENERIC_RESY, 0, blackColor, blackColor);
+ 
+-    XSelectInput(s_Display, s_Window, StructureNotifyMask | KeyPressMask | KeyReleaseMask);
+-
++    XSelectInput(s_Display, s_Window, StructureNotifyMask | KeyPressMask | KeyReleaseMask | FocusChangeMask);
++
++    s_DeleteWindow = XInternAtom(s_Display, "WM_DELETE_WINDOW", False);
++    XSetWMProtocols(s_Display, s_Window, &s_DeleteWindow, 1);
++    XSizeHints hints = {0};
++    hints.flags = PMinSize | PMaxSize;
++    hints.min_width = hints.max_width = DOOMGENERIC_RESX;
++    hints.min_height = hints.max_height = DOOMGENERIC_RESY;
++    XSetWMNormalHints(s_Display, s_Window, &hints);
++    XClassHint class_hint = {"doom", "Doom"};
++    XSetClassHint(s_Display, s_Window, &class_hint);
+     XMapWindow(s_Display, s_Window);
+ 
+     s_Gc = XCreateGC(s_Display, s_Window, 0, NULL);
+@@ -121,7 +149,7 @@
+         }
+     }
+ 
+-    s_Image = XCreateImage(s_Display, DefaultVisual(s_Display, s_Screen), depth, ZPixmap, 0, (char *)DG_ScreenBuffer, DOOMGENERIC_RESX, DOOMGENERIC_RESX, 32, 0);
++    s_Image = XCreateImage(s_Display, DefaultVisual(s_Display, s_Screen), depth, ZPixmap, 0, (char *)DG_ScreenBuffer, DOOMGENERIC_RESX, DOOMGENERIC_RESY, 32, 0);
+ }
+ 
+ 
+@@ -133,7 +161,23 @@
+         {
+             XEvent e;
+             XNextEvent(s_Display, &e);
+-            if (e.type == KeyPress)
++            if (e.type == ClientMessage && (Atom)e.xclient.data.l[0] == s_DeleteWindow)
++            {
++                I_Quit();
++            }
++            else if (e.type == FocusOut)
++            {
++                for (unsigned int key = 0; key < sizeof(s_HeldKeys); key++)
++                {
++                    if (s_HeldKeys[key])
++                    {
++                        s_KeyQueue[s_KeyQueueWriteIndex] = key;
++                        s_KeyQueueWriteIndex = (s_KeyQueueWriteIndex + 1) % KEYQUEUE_SIZE;
++                        s_HeldKeys[key] = 0;
++                    }
++                }
++            }
++            else if (e.type == KeyPress)
+             {
+                 KeySym sym = XkbKeycodeToKeysym(s_Display, e.xkey.keycode, 0, 0);
+                 //printf("KeyPress:%d sym:%d\n", e.xkey.keycode, sym);
+@@ -150,7 +194,7 @@
+ 
+         XPutImage(s_Display, s_Window, s_Gc, s_Image, 0, 0, 0, 0, DOOMGENERIC_RESX, DOOMGENERIC_RESY);
+ 
+-        //XFlush(s_Display);
++        XFlush(s_Display);
+     }
+ 
+     //printf("frame\n");

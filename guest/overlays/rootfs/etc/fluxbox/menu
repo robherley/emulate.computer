@@ -1,0 +1,16 @@
+[begin] (Applications)
+  [exec] (Terminal) {xterm -fn fixed +sb -bg '#0a0a0a' -fg '#ededed' -title Terminal -n Terminal}
+  [exec] (Browser) {dillo}
+  [submenu] (Utilities)
+    [exec] (Notepad) {adie}
+    [exec] (Files) {PathFinder}
+    [exec] (Calculator) {xcalc}
+    [exec] (Clock) {xclock}
+  [end]
+  [submenu] (Games)
+    [exec] (Doom) {/usr/local/bin/doom > /tmp/doom.log 2>&1}
+    [exec] (Solitaire) {ace-solitaire}
+    [exec] (Minesweeper) {ace-minesweeper}
+    [exec] (Tetris) {xtris -s}
+  [end]
+[end]

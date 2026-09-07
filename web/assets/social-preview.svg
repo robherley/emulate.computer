@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+  <rect x="0" y="0" width="1200" height="6" fill="#349cff"/>
+  <g transform="translate(72 66) scale(1.75)">
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="#0068d6" stroke="#b9d9ff" stroke-width="1.5"/>
+  <rect x="6" y="7" width="20" height="14" rx="2" fill="#10243a" stroke="#fff" stroke-width="2"/>
+  <path d="m10 11 3 3-3 3m6 0h4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M16 22v3m-4 0h8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g font-family="Verdana, sans-serif">
+    <text x="150" y="108" font-size="44" fill="#f5f5f5" letter-spacing="-1.8">emulate.computer</text>
+    <text x="72" y="212" font-size="42" fill="#f5f5f5" letter-spacing="-1.6">An entire Linux computer in your browser.</text>
+    <text x="74" y="256" font-size="23" fill="#a3a3a3">RISC-V · Alpine Linux · WebAssembly</text>
+  </g>
+  <defs>
+    <clipPath id="desktop"><rect x="612" y="302" width="516" height="250" rx="12"/></clipPath>
+  </defs>
+  <rect x="72" y="302" width="516" height="250" rx="12" fill="#111111" stroke="#303030" stroke-width="2"/>
+  <path d="M73 348h514" stroke="#303030"/>
+  <g font-family="Andale Mono, monospace" font-size="23">
+    <text x="104" y="334" font-size="18" fill="#a3a3a3">console</text>
+    <text x="104" y="395" fill="#349cff">$ uname -m</text>
+    <text x="104" y="432" fill="#ededed">riscv64</text>
+    <text x="104" y="503" fill="#349cff">$</text>
+    <rect x="134" y="482" width="12" height="25" fill="#349cff"/>
+  </g>
+  <g clip-path="url(#desktop)" font-family="Verdana, sans-serif">
+    <rect x="612" y="302" width="516" height="250" fill="#10243a"/>
+    <rect x="612" y="302" width="516" height="46" fill="#111111"/>
+    <text x="644" y="334" font-family="Andale Mono, monospace" font-size="18" fill="#a3a3a3">desktop</text>
+    <path d="M612 348h516" stroke="#303030"/>
+    <rect x="634" y="366" width="258" height="144" fill="#0a0a0a" stroke="#555555"/>
+    <rect x="635" y="367" width="256" height="22" fill="#1c1c1c"/>
+    <text x="644" y="382" font-size="11" fill="#a1a1a1">Terminal</text>
+    <g font-family="Andale Mono, monospace" font-size="12">
+      <text x="645" y="410" fill="#349cff">~ # python3</text>
+      <text x="645" y="429" fill="#ededed">Python 3.12.14</text>
+      <text x="645" y="451" fill="#ededed">&gt;&gt;&gt; 2 + 2</text>
+      <text x="645" y="470" fill="#ededed">4</text>
+      <text x="645" y="492" fill="#349cff">&gt;&gt;&gt; _</text>
+    </g>
+    <rect x="779" y="382" width="324" height="140" fill="#ffffff" stroke="#555555"/>
+    <rect x="780" y="383" width="322" height="22" fill="#252525"/>
+    <text x="790" y="398" font-size="11" fill="#ededed">Web - emulate.computer</text>
+    <g stroke="#ededed" fill="none" stroke-width="1.2">
+      <path d="M1050 397h7"/>
+      <rect x="1067" y="390" width="7" height="7"/>
+      <path d="m1086 390 7 7m0-7-7 7"/>
+    </g>
+    <rect x="780" y="405" width="322" height="23" fill="#e9e9e9"/>
+    <path d="m793 412-4 4 4 4m-4-4h11" fill="none" stroke="#666666" stroke-width="1.5"/>
+    <rect x="808" y="409" width="283" height="15" fill="#ffffff" stroke="#bcbcbc"/>
+    <text x="814" y="420" font-size="9" fill="#555555">file:/usr/share/emulate/index.html</text>
+    <text x="793" y="453" font-size="19" fill="#111111">emulate.computer</text>
+    <text x="793" y="476" font-size="11" fill="#444444">A RISC-V Linux computer in your browser.</text>
+    <text x="793" y="501" font-size="11" fill="#0068d6">Programs and utilities</text>
+    <text x="965" y="501" font-size="11" fill="#0068d6">Source code</text>
+    <rect x="612" y="527" width="516" height="25" fill="#121212"/>
+    <text x="626" y="544" font-size="10" fill="#ededed">Applications</text>
+    <rect x="703" y="530" width="92" height="19" fill="#181818"/>
+    <text x="713" y="543" font-size="10" fill="#b8b8b8">Terminal</text>
+    <rect x="798" y="530" width="230" height="19" fill="#284769"/>
+    <text x="808" y="543" font-size="10" fill="#ffffff">Dillo</text>
+    <text x="1081" y="544" font-size="10" fill="#ededed">12:00</text>
+  </g>
+  <rect x="612" y="302" width="516" height="250" rx="12" fill="none" stroke="#303030" stroke-width="2"/>
+</svg>

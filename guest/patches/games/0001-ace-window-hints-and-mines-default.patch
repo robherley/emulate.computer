@@ -1,0 +1,31 @@
+Xlib's format-32 properties use native longs in the client-side buffer.
+Use a readable 11x11 Minesweeper board by default; keys 1-4 change difficulty.
+
+--- a/lib/xwin.c
++++ b/lib/xwin.c
+@@ -89,10 +89,10 @@
+ /* Motif window hints */
+ typedef struct
+ {
+-  unsigned flags;
+-  unsigned functions;
+-  unsigned decorations;
+-  int inputMode;
++  unsigned long flags;
++  unsigned long functions;
++  unsigned long decorations;
++  long inputMode;
+ } PropMotifWmHints;
+ 
+ typedef PropMotifWmHints        PropMwmHints;
+--- a/games/minesweeper.c
++++ b/games/minesweeper.c
+@@ -139,7 +139,7 @@
+   cells[1] = get_picture("minesweeper-c36");
+   cells[2] = get_picture("minesweeper-c24");
+   cells[3] = get_picture("minesweeper-c12");
+-  level = 3;
++  level = 1;
+   start_again();
+ }
+ 

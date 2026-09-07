@@ -1,0 +1,16 @@
+[PathFinder Settings]
+directory=/root
+editor=adie
+width=720
+height=440
+thumbnails=0
+
+[FILETYPES]
+txt=adie %s &;Text document;;;text/plain
+md=adie %s &;Markdown document;;;text/plain
+log=adie %s &;Log file;;;text/plain
+conf=adie %s &;Configuration file;;;text/plain
+json=adie %s &;JSON document;;;application/json
+py=adie %s &;Python source;;;text/plain
+js=adie %s &;JavaScript source;;;text/plain
+sh=adie %s &;Shell script;;;text/plain

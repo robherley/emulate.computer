@@ -1,0 +1,55 @@
+--- a/hw/kdrive/fbdev/fbdev.c
++++ b/hw/kdrive/fbdev/fbdev.c
+@@ -43,6 +43,20 @@
+ static volatile CARD32 *emuBlitter;
+ static uintptr_t emuFramebuffer;
+ static void *emuFramebufferMapping;
++static Bool emuPresentRegistered;
++
++static void
++emuPresent(void *data, void *timeout)
++{
++    __sync_synchronize();
++    emuBlitter[1] = 3;
++    __sync_synchronize();
++}
++
++static void
++emuWakeup(void *data, int result)
++{
++}
+ 
+ enum { EMU_ID, EMU_COMMAND, EMU_SOURCE, EMU_DESTINATION,
+        EMU_WIDTH, EMU_HEIGHT, EMU_AND, EMU_XOR };
+@@ -124,7 +138,7 @@
+             close(fd);
+             return;
+         }
+-        if (((volatile CARD32 *) mapping)[EMU_ID] != 0x45464201) {
++        if (((volatile CARD32 *) mapping)[EMU_ID] != 0x45464202) {
+             munmap(mapping, 4096);
+             close(fd);
+             return;
+@@ -143,6 +157,8 @@
+     /* simpledrm's /dev/fb0 mapping is a deferred-I/O shadow, not scanout RAM. */
+     priv->fb = emuFramebufferMapping;
+     emuFramebuffer = (uintptr_t) priv->fb;
++    if (!emuPresentRegistered)
++        emuPresentRegistered = RegisterBlockAndWakeupHandlers(emuPresent, emuWakeup, NULL);
+     fbCopyAccelerated = emuCopy;
+     fbSolidAccelerated = emuSolid;
+ }
+@@ -940,7 +956,13 @@
+ 
+     fbCopyAccelerated = NULL;
+     fbSolidAccelerated = NULL;
++    if (emuPresentRegistered) {
++        RemoveBlockAndWakeupHandlers(emuPresent, emuWakeup, NULL);
++        emuPresentRegistered = FALSE;
++    }
+     if (emuBlitter) {
++        emuBlitter[EMU_COMMAND] = 4;
++        __sync_synchronize();
+         munmap((void *) emuBlitter, 4096);
+         emuBlitter = NULL;
+         munmap(emuFramebufferMapping, EMU_FB_SIZE);

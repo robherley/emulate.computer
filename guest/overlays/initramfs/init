@@ -1,0 +1,73 @@
+#!/bin/sh
+# PID 1 of the initramfs: mount pseudo-filesystems, install busybox applet
+# symlinks, then hand off to busybox init (which respawns ash on ttyS0).
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+/bin/busybox mount -t proc proc /proc
+/bin/busybox mount -t sysfs sysfs /sys
+/bin/busybox mount -t devtmpfs devtmpfs /dev 2>/dev/null
+/bin/busybox --install -s
+hostname emulate.computer 2>/dev/null
+
+# guest/Dockerfile packs the modules under the kernel's own release directory,
+# which is exactly what `uname -r` prints, so the version is not duplicated here.
+modules="/lib/modules/$(/bin/busybox uname -r)"
+
+# The Alpine kernel builds VirtIO as modules; the transport and entropy
+# drivers are needed in both boot modes. virtio_ring comes first: since Linux
+# 6.18 virtio.ko itself imports from it (virtio_break_device moved), so the
+# 6.12-era order fails with "Unknown symbol virtio_break_device".
+for module in virtio_ring virtio virtio_mmio virtio-rng; do
+  insmod "$modules/$module.ko" || exec sh
+done
+
+# Networking is optional: the device may be absent, so failures here must never
+# cost a shell.
+for module in failover net_failover virtio_net af_packet; do
+  insmod "$modules/$module.ko" 2>/dev/null || true
+done
+
+# The graphical session's input, equally optional: virtio_input binds the host's
+# keyboard and tablet if it declared any, evdev exposes them as
+# /dev/input/event*, and both are no-ops on a host that attached neither. The
+# display itself needs nothing loaded — simpledrm and fbcon are built into the
+# kernel, so a `simple-framebuffer` node alone yields /dev/fb0. See
+# docs/display.md.
+for module in virtio_console virtio_input evdev; do
+  insmod "$modules/$module.ko" 2>/dev/null || true
+done
+
+# A host that attaches a network backend flips the bootargs placeholder
+# emulate.net=none to emulate.net=dhcp before loading the DTB. udhcpc raises
+# eth0 itself; the state set here survives switch_root (resolv.conf is copied
+# below).
+if grep -q 'emulate.net=dhcp' /proc/cmdline; then
+  udhcpc -i eth0 -n -q -t 10 -T 1 >/dev/null 2>&1 || true
+fi
+
+# Hand a requested block root to Alpine's own BusyBox init; otherwise the
+# initramfs shell is the default.
+if grep -q 'emulate.root=/dev/vda' /proc/cmdline; then
+  insmod "$modules/virtio_blk.ko" || exec sh
+  # ext4 is a module in Alpine's 6.18 lts config; load it and its dependency
+  # chain, or the mount below fails with "No such device".
+  for module in crc16 mbcache jbd2 ext4; do
+    insmod "$modules/$module.ko" 2>/dev/null || true
+  done
+  tries=0
+  while [ ! -b /dev/vda ] && [ "$tries" -lt 50 ]; do
+    sleep 0.1
+    tries=$((tries + 1))
+  done
+  mkdir -p /newroot
+  mount -t ext4 -o rw /dev/vda /newroot || exec sh
+  # DHCP ran against the initramfs /etc; carry the resolver into the new root.
+  if [ -f /etc/resolv.conf ]; then
+    cp /etc/resolv.conf /newroot/etc/resolv.conf 2>/dev/null || true
+  fi
+  mount --move /proc /newroot/proc
+  mount --move /sys /newroot/sys
+  mount --move /dev /newroot/dev
+  exec switch_root /newroot /sbin/init
+fi
+
+exec /bin/busybox init

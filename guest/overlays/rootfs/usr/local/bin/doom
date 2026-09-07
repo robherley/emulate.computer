@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+export DISPLAY="${DISPLAY:-:0}"
+state="${HOME:-/root}/.local/share/doom"
+mkdir -p "$state"
+cd "$state"
+if [ ! -f doom.cfg ]; then
+    printf '%s\n' 'vanilla_savegame_limit 0' 'vanilla_demo_limit 0' > doom.cfg
+fi
+exec /usr/bin/doomgeneric -iwad /usr/share/games/doom/freedoom1.wad \
+    -extraconfig doom.cfg -mb 16 "$@"

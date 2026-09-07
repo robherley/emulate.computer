@@ -1,0 +1,34 @@
+session.configVersion: 13
+session.menuFile: /etc/fluxbox/menu
+session.keyFile: /etc/fluxbox/keys
+session.styleFile: /etc/fluxbox/style
+session.appsFile: /etc/fluxbox/apps
+session.styleOverlay: /etc/fluxbox/overlay
+session.screen0.windowMenu: /etc/fluxbox/windowmenu
+session.screen0.titlebar.left:
+session.screen0.titlebar.right: Minimize Maximize Close
+session.screen0.workspaces: 1
+session.screen0.workspaceNames: Desktop
+session.screen0.autoRaise: false
+session.screen0.focusModel: ClickFocus
+session.screen0.focusNewWindows: true
+session.screen0.opaqueMove: true
+session.screen0.showwindowposition: false
+session.screen0.workspacewarping: false
+session.screen0.tabs.intitlebar: true
+session.screen0.tabs.usePixmap: false
+session.screen0.toolbar.tools: RootMenu, Iconbar, Clock
+session.screen0.toolbar.widthPercent: 100
+session.screen0.toolbar.placement: BottomCenter
+session.screen0.toolbar.height: 33
+session.screen0.toolbar.autoHide: false
+session.screen0.toolbar.layer: Dock
+session.screen0.toolbar.alpha: 255
+session.screen0.iconbar.mode: Workspace
+session.screen0.iconbar.alignment: Left
+session.screen0.iconbar.iconWidth: 220
+session.screen0.iconbar.usePixmap: false
+session.screen0.strftimeFormat: %H:%M
+session.screen0.fullMaximization: false
+session.screen0.maxDisableMove: false
+session.screen0.maxDisableResize: false

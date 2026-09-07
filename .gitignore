@@ -1,0 +1,37 @@
+/node_modules/
+/.vercel/
+/web/src/generated/
+/target/
+/web/node_modules/
+/relay/node_modules/
+/web/dist/
+/web/src/wasm/
+/web/public/guest/
+
+# Local editor/agent state and operating-system metadata.
+/.claude/
+/.codex/
+/.agents/
+/.idea/
+/.vscode/
+.DS_Store
+*.swp
+*~
+
+# Local configuration, logs, and coverage output.
+.env
+.env.*
+!.env.example
+*.log
+/coverage/
+__pycache__/
+*.py[cod]
+
+# Reproducibly downloaded or generated guest artifacts.
+/guest/out/
+
+# Pinned upstream repositories are materialized by `just ci-vendor-*`.
+/vendor/riscv-tests/
+/vendor/riscv-arch-test/
+/vendor/xv6-riscv/
+/web/generated-public/

@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["crates/emulate-core", "crates/emulate-cli", "crates/emulate-wasm"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[profile.release.package.emulate-wasm]
+opt-level = 3
+
+# Guest tests need an optimized interpreter; test harnesses remain debuggable.
+[profile.dev.package.emulate-core]
+opt-level = 3

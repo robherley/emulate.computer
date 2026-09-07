@@ -1,0 +1,22 @@
+[package]
+name = "emulate-wasm"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+emulate-core = { path = "../emulate-core", features = ["hostnet"] }
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "FileSystemReadWriteOptions",
+    "FileSystemSyncAccessHandle",
+    # Attributing a failed OPFS call: the exception behind it, and a console
+    # trail for when the guest only shows an opaque EIO.
+    "DomException",
+    "console",
+] }

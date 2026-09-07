@@ -1,0 +1,24 @@
+[package]
+name = "emulate-cli"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "emulate.computer's RISC-V RV64GC emulator: boot a system or run riscv-tests/ACT4 ELFs"
+repository = "https://github.com/robherley/emulate.computer"
+
+[lib]
+name = "emulate_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "emulate-computer"
+path = "src/main.rs"
+
+[dependencies]
+emulate-core = { path = "../emulate-core", features = ["hostnet"] }
+object = { version = "0.36", default-features = false, features = ["read_core", "elf", "std"] }
+clap = { version = "4", default-features = false, features = ["derive", "std", "help", "usage", "error-context"] }
+libc = "0.2"
+# The blocking WebSocket client `--net user` dials the relay with. No TLS: the
+# relay it talks to is a local `ws://` one (relay/server.ts).
+tungstenite = { version = "0.29", default-features = false, features = ["handshake"] }

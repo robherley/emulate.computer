@@ -1,0 +1,12 @@
+::sysinit:/bin/hostname -F /etc/hostname
+::sysinit:/bin/mkdir -p /dev/pts /dev/shm
+::sysinit:/bin/mount -t devpts devpts /dev/pts
+::sysinit:/bin/mount -t tmpfs tmpfs /dev/shm
+::sysinit:/bin/mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp
+::sysinit:/sbin/ip link set lo up
+::sysinit:/usr/local/bin/emuctl desktop boot
+::respawn:/usr/local/bin/emuctl serve
+ttyS0::respawn:/bin/login -f root
+::ctrlaltdel:/sbin/reboot
+::shutdown:/bin/umount -a -r
+::restart:/sbin/init

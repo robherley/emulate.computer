@@ -1,0 +1,196 @@
+/dts-v1/;
+
+/*
+ * emulate.computer virt machine — must match emulate-core/src/bus.rs:
+ *   DRAM  0x8000_0000 (size patched by dts/build.sh, default 128 MB)
+ *   UART  0x1000_0000  irq 10 (ns16550a, byte-wide regs)
+ *   RTC   0x0010_1000  irq 11 (google,goldfish-rtc)
+ *   CLINT 0x0200_0000
+ *   PLIC  0x0C00_0000  (ctx0 = hart0 M, ctx1 = hart0 S)
+ *   VIRTIO-BLK 0x1000_1000 irq 1
+ *   VIRTIO-RNG 0x1000_2000 irq 2
+ *   VIRTIO-NET 0x1000_3000 irq 3
+ *   VIRTIO-INPUT (keyboard) 0x1000_4000 irq 4
+ *   VIRTIO-INPUT (tablet)   0x1000_5000 irq 5
+ *   FRAMEBUFFER 0x8700_0000, 1024x768 x8r8g8b8 (inside DRAM, not a device)
+ *   TEST  0x0010_0000  (sifive,test0 finisher: poweroff/reboot)
+ * timebase-frequency must equal emulate-core machine::TIMEBASE_FREQ (10 MHz).
+ * Placeholders @INITRD_START@/@INITRD_END@/@BOOTARGS@/@RAM_SIZE@ and the
+ * @FB_*@ display geometry are filled in by dts/build.sh, inside the `dtb`
+ * stage of guest/Dockerfile, before dtc runs. The framebuffer geometry has one
+ * source of truth in emulate-core/src/devices/framebuffer.rs; build.sh carries
+ * a copy and crates/emulate-core/tests/dts_geometry.rs fails on any drift.
+ */
+
+/ {
+    #address-cells = <2>;
+    #size-cells = <2>;
+    compatible = "riscv-virtio";
+    model = "emulate.computer,virt";
+
+    chosen {
+        bootargs = "@BOOTARGS@";
+        stdout-path = "/soc/serial@10000000";
+        linux,initrd-start = <0x0 @INITRD_START@>;
+        linux,initrd-end = <0x0 @INITRD_END@>;
+    };
+
+    /*
+     * Shrunk by the display reservation: the machine really has 128 MiB, but
+     * the top 16 MiB are the framebuffer below and must not be allocatable.
+     */
+    memory@80000000 {
+        device_type = "memory";
+        reg = <0x0 0x80000000 0x0 @RAM_SIZE@>;
+    };
+
+    /*
+     * The display. Ordinary DRAM as far as the emulator's bus is concerned
+     * (docs/display.md): this node is the whole of what makes the guest bind
+     * simpledrm to it and give us /dev/fb0 plus a graphical console. The
+     * stride is one 4 KiB page per scanline, which is what lets the host read
+     * dirty rows straight out of RAM's per-page write generations.
+     */
+    /* "framebuffer@" + the @FB_UNIT@ placeholder; build.sh fills the rest. */
+    framebuffer@@FB_UNIT@ {
+        compatible = "simple-framebuffer";
+        reg = <0x0 @FB_BASE@ 0x0 @FB_SIZE@>;
+        width = <@FB_WIDTH@>;
+        height = <@FB_HEIGHT@>;
+        stride = <@FB_STRIDE@>;
+        format = "@FB_FORMAT@";
+    };
+
+    cpus {
+        #address-cells = <1>;
+        #size-cells = <0>;
+        timebase-frequency = <10000000>;
+
+        cpu0: cpu@0 {
+            device_type = "cpu";
+            reg = <0>;
+            status = "okay";
+            compatible = "riscv";
+            riscv,isa = "rv64imafdc_zicsr_zifencei_zbb_zbc_zbkb_zknd_zkne_zknh";
+            riscv,isa-base = "rv64i";
+            riscv,isa-extensions = "i", "m", "a", "f", "d", "c",
+                                   "zicsr", "zifencei",
+                                   "zbb", "zbc", "zbkb",
+                                   "zknd", "zkne", "zknh";
+            mmu-type = "riscv,sv39";
+
+            cpu0_intc: interrupt-controller {
+                #interrupt-cells = <1>;
+                interrupt-controller;
+                compatible = "riscv,cpu-intc";
+            };
+        };
+    };
+
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        compatible = "simple-bus";
+        ranges;
+
+        clint@2000000 {
+            compatible = "sifive,clint0", "riscv,clint0";
+            reg = <0x0 0x2000000 0x0 0x10000>;
+            interrupts-extended = <&cpu0_intc 3 &cpu0_intc 7>;
+        };
+
+        plic: interrupt-controller@c000000 {
+            compatible = "sifive,plic-1.0.0", "riscv,plic0";
+            reg = <0x0 0xc000000 0x0 0x600000>;
+            interrupt-controller;
+            #interrupt-cells = <1>;
+            #address-cells = <0>;
+            riscv,ndev = <31>;
+            interrupts-extended = <&cpu0_intc 11 &cpu0_intc 9>;
+        };
+
+        serial@10000000 {
+            compatible = "ns16550a";
+            reg = <0x0 0x10000000 0x0 0x100>;
+            clock-frequency = <3686400>;
+            current-speed = <115200>;
+            reg-shift = <0>;
+            reg-io-width = <1>;
+            interrupt-parent = <&plic>;
+            interrupts = <10>;
+        };
+
+        rtc@101000 {
+            compatible = "google,goldfish-rtc";
+            reg = <0x0 0x00101000 0x0 0x1000>;
+            interrupt-parent = <&plic>;
+            interrupts = <11>;
+        };
+
+        virtio_mmio@10001000 {
+            compatible = "virtio,mmio";
+            reg = <0x0 0x10001000 0x0 0x1000>;
+            interrupt-parent = <&plic>;
+            interrupts = <1>;
+        };
+
+        virtio_mmio@10002000 {
+            compatible = "virtio,mmio";
+            reg = <0x0 0x10002000 0x0 0x1000>;
+            interrupt-parent = <&plic>;
+            interrupts = <2>;
+        };
+
+        virtio_mmio@10003000 {
+            compatible = "virtio,mmio";
+            reg = <0x0 0x10003000 0x0 0x1000>;
+            interrupt-parent = <&plic>;
+            interrupts = <3>;
+        };
+
+        virtio_mmio@10004000 {
+            compatible = "virtio,mmio";
+            reg = <0x0 0x10004000 0x0 0x1000>;
+            interrupt-parent = <&plic>;
+            interrupts = <4>;
+        };
+
+        virtio_mmio@10005000 {
+            compatible = "virtio,mmio";
+            reg = <0x0 0x10005000 0x0 0x1000>;
+            interrupt-parent = <&plic>;
+            interrupts = <5>;
+        };
+
+        virtio_mmio@10007000 {
+            compatible = "virtio,mmio";
+            reg = <0x0 0x10007000 0x0 0x1000>;
+            interrupt-parent = <&plic>;
+            interrupts = <6>;
+        };
+
+        blitter@10006000 {
+            compatible = "emulate,framebuffer-blitter";
+            reg = <0x0 0x10006000 0x0 0x1000>;
+        };
+
+        test: test@100000 {
+            compatible = "sifive,test1", "sifive,test0", "syscon";
+            reg = <0x0 0x100000 0x0 0x1000>;
+        };
+
+        poweroff {
+            compatible = "syscon-poweroff";
+            regmap = <&test>;
+            offset = <0>;
+            value = <0x5555>;
+        };
+
+        reboot {
+            compatible = "syscon-reboot";
+            regmap = <&test>;
+            offset = <0>;
+            value = <0x7777>;
+        };
+    };
+};

@@ -1,0 +1,83 @@
+Absolute tablet coordinates for kdrive, submitted once per SYN_REPORT.
+Both axes belong to one position; submitting each axis separately creates
+extra motion events with an intermediate position.
+
+--- a/hw/kdrive/linux/evdev.c
++++ b/hw/kdrive/linux/evdev.c
+@@ -91,6 +91,26 @@
+     }
+ }
+
++/*
++ * Map one absolute axis from the device's own reported range onto [0, extent).
++ */
++static int
++EvdevScaleAbs(Kevdev * ke, int axis, int extent)
++{
++    int lo = ke->absinfo[axis].minimum;
++    int hi = ke->absinfo[axis].maximum;
++    int v = ke->abs[axis];
++
++    if (hi <= lo || extent < 2)
++        return 0;
++    if (v < lo)
++        v = lo;
++    if (v > hi)
++        v = hi;
++
++    return (int) (((long long) (v - lo) * (extent - 1)) / (hi - lo));
++}
++
+ static void
+ EvdevPtrMotion(KdPointerInfo * pi, struct input_event *ev)
+ {
+@@ -113,19 +133,19 @@
+             }
+             break;
+         }
+-    for (i = 0; i < ke->max_abs; i++)
+-        if (ke->abs[i] != ke->prevabs[i]) {
+-            int a;
+-
+-            ErrorF("abs");
+-            for (a = 0; a <= ke->max_abs; a++) {
+-                if (ISBITSET(ke->absbits, a))
+-                    ErrorF(" %d=%d", a, ke->abs[a]);
+-                ke->prevabs[a] = ke->abs[a];
+-            }
+-            ErrorF("\n");
+-            break;
+-        }
++    /* kinput.c expects absolute screen coordinates with KD_MOUSE_DELTA clear. */
++    if ((ISBITSET(ke->absbits, ABS_X) || ISBITSET(ke->absbits, ABS_Y)) &&
++        (ke->abs[ABS_X] != ke->prevabs[ABS_X] ||
++         ke->abs[ABS_Y] != ke->prevabs[ABS_Y]) && screenInfo.numScreens > 0) {
++        ScreenPtr pScreen = screenInfo.screens[0];
++
++        ke->prevabs[ABS_X] = ke->abs[ABS_X];
++        ke->prevabs[ABS_Y] = ke->abs[ABS_Y];
++
++        KdEnqueuePointerEvent(pi, flags & ~KD_MOUSE_DELTA,
++                              EvdevScaleAbs(ke, ABS_X, pScreen->width),
++                              EvdevScaleAbs(ke, ABS_Y, pScreen->height), 0);
++    }
+
+     if (ev->code == REL_WHEEL) {
+         for (i = 0; i < abs(ev->value); i++) {
+@@ -167,6 +187,8 @@
+     for (i = 0; i < n; i++) {
+         switch (events[i].type) {
+         case EV_SYN:
++            if (events[i].code == SYN_REPORT)
++                EvdevPtrMotion(pi, &events[i]);
+             break;
+         case EV_KEY:
+             EvdevPtrBtn(pi, &events[i]);
+@@ -177,7 +199,6 @@
+             break;
+         case EV_ABS:
+             ke->abs[events[i].code] = events[i].value;
+-            EvdevPtrMotion(pi, &events[i]);
+             break;
+         }
+     }

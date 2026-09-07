@@ -1,0 +1,8 @@
+# BusyBox init configuration for the emulate.computer initramfs. The persistent
+# root has its own (rootfs/inittab): there is no bash and no real /etc/passwd
+# here, so this respawns a bare root ash instead of a login.
+::sysinit:/bin/true
+ttyS0::respawn:-/bin/ash
+::ctrlaltdel:/sbin/reboot
+::shutdown:/bin/umount -a -r
+::restart:/sbin/init

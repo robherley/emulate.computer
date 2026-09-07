@@ -1,0 +1,356 @@
+#!/bin/sh
+
+set -eu
+
+DISPLAY_NUM=:0
+SCREEN=
+BACKGROUND='#18191b'
+TERMINAL_FONT=fixed
+TERMINAL_BG='#0a0a0a'
+TERMINAL_FG='#ededed'
+TERMINAL_CURSOR='#3b9eff'
+RUN_DIR="/tmp/.desktop-$(id -u)"
+PID_FILE="$RUN_DIR/xfbdev.pid"
+LOG_FILE="$RUN_DIR/xfbdev.log"
+SOCKET="/tmp/.X11-unix/X${DISPLAY_NUM#:}"
+LOCK="/tmp/.X${DISPLAY_NUM#:}-lock"
+NET_PID_FILE=/tmp/emuctl-net.pid
+
+report() {
+	[ ! -c /dev/hvc0 ] || printf '0 desktop %s\n' "$1" > /dev/hvc0
+}
+
+set_state() {
+	mkdir -p "$RUN_DIR"
+	printf '%s\n' "$1" > "$RUN_DIR/state"
+	report "$1"
+}
+
+die() {
+	mkdir -p "$RUN_DIR"
+	set_state failed
+	echo "emuctl desktop: $*" >&2
+	exit 1
+}
+
+screen_geometry() {
+	size="$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null || true)"
+	case "$size" in
+	[0-9]*,[0-9]*) echo "${size%,*}x${size#*,}" ;;
+	*) return 1 ;;
+	esac
+}
+
+capable() {
+	[ -r "$1" ] || return 1
+	case "$(tr -d ' 0' <"$1")" in
+	'') return 1 ;;
+	*) return 0 ;;
+	esac
+}
+
+find_input_devices() {
+	KEYBOARD=
+	POINTER=
+	KEYBOARD_NAME=
+	POINTER_NAME=
+	for sysdev in /sys/class/input/event*; do
+		[ -e "$sysdev/device/name" ] || continue
+		node="/dev/input/${sysdev##*/}"
+		[ -e "$node" ] || continue
+		name="$(cat "$sysdev/device/name" 2>/dev/null || echo '?')"
+		caps="$sysdev/device/capabilities"
+		if capable "$caps/abs" || capable "$caps/rel"; then
+			[ -n "$POINTER" ] || {
+				POINTER="$node"
+				POINTER_NAME="$name"
+			}
+		elif capable "$caps/key"; then
+			[ -n "$KEYBOARD" ] || {
+				KEYBOARD="$node"
+				KEYBOARD_NAME="$name"
+			}
+		fi
+	done
+}
+
+kill_by_name() {
+	pkill -u "$(id -u)" -x "$1" 2>/dev/null || true
+	set -- $(ps -o pid,comm 2>/dev/null |
+		awk -v name="$1" '$2 == name { print $1 }')
+	[ "$#" -gt 0 ] || return 0
+	kill "$@" 2>/dev/null || true
+}
+
+server_pid() {
+	[ -f "$PID_FILE" ] || return 1
+	IFS= read -r pid < "$PID_FILE" || return 1
+	[ -n "$pid" ] || return 1
+	[ -d "/proc/$pid" ] || return 1
+	echo "$pid"
+}
+
+start() {
+	if server_pid >/dev/null 2>&1; then
+		report "$(cat "$RUN_DIR/state")"
+		return
+	fi
+
+	set_state starting
+
+	[ -c /dev/fb0 ] || die "no /dev/fb0 — this guest has no display device"
+	SCREEN="$(screen_geometry)" || die "cannot read the framebuffer geometry"
+	[ -c /dev/tty0 ] || die "no /dev/tty0 — the X server needs a virtual terminal"
+	find_input_devices
+	[ -n "$KEYBOARD" ] || die "no keyboard found under /sys/class/input"
+	[ -n "$POINTER" ] || die "no pointer found under /sys/class/input"
+
+	rm -f "$PID_FILE" "$LOG_FILE"
+
+	if [ -e "$SOCKET" ] || [ -e "$LOCK" ]; then
+		echo "emuctl desktop: clearing a stale X socket and lock"
+		rm -f "$SOCKET" "$LOCK" 2>/dev/null || true
+	fi
+
+	echo "emuctl desktop: keyboard $KEYBOARD ($KEYBOARD_NAME)"
+	echo "emuctl desktop: pointer  $POINTER ($POINTER_NAME)"
+	echo "emuctl desktop: starting Xfbdev on $DISPLAY_NUM, $SCREEN"
+
+	/usr/bin/Xfbdev "$DISPLAY_NUM" \
+		-screen $SCREEN -fb /dev/fb0 \
+		-mouse evdev,,device=$POINTER \
+		-keybd evdev,,device=$KEYBOARD \
+		-ac -noreset -nolisten tcp -dpi 96 \
+		>"$LOG_FILE" 2>&1 &
+	echo "$!" >"$PID_FILE"
+	# Keep input and window movement responsive while ordinary guest jobs are busy.
+	renice -5 "$!" >/dev/null 2>&1 || true
+
+	DISPLAY="$DISPLAY_NUM"
+	export DISPLAY
+
+	waited=0
+	until xsetroot -solid "$BACKGROUND" 2>/dev/null; do
+		if ! server_pid >/dev/null 2>&1; then
+			echo "emuctl desktop: the X server exited during startup; last words:" >&2
+			tail -20 "$LOG_FILE" >&2 2>/dev/null || true
+			stop >/dev/null 2>&1 || true
+			set_state failed
+			exit 1
+		fi
+		if [ "$waited" -ge 600 ]; then
+			echo "emuctl desktop: X server never accepted a client; last words:" >&2
+			tail -20 "$LOG_FILE" >&2 2>/dev/null || true
+			stop >/dev/null 2>&1 || true
+			set_state failed
+			exit 1
+		fi
+		sleep 0.1
+		waited=$((waited + 1))
+	done
+	echo "emuctl desktop: $DISPLAY_NUM accepted its first client after $((waited / 10)).$((waited % 10))s"
+
+	fluxbox -rc /etc/fluxbox/init >>"$RUN_DIR/wm.log" 2>&1 &
+	echo "$!" > "$RUN_DIR/wm.pid"
+	renice -5 "$!" >/dev/null 2>&1 || true
+
+	xterm -geometry 100x30+40+40 -fn "$TERMINAL_FONT" \
+		-bg "$TERMINAL_BG" -fg "$TERMINAL_FG" -cr "$TERMINAL_CURSOR" +sb \
+		-title 'Terminal' -n 'Terminal' -e bash --rcfile /usr/share/emulate/desktop.bashrc >>"$RUN_DIR/xterm.log" 2>&1 &
+
+	waited=0
+	until xprop -name Terminal WM_STATE 2>/dev/null | grep -q Normal; do
+		[ "$waited" -lt 120 ] || die "window manager did not become ready"
+		kill -0 "$(cat "$RUN_DIR/wm.pid")" 2>/dev/null || die "window manager exited"
+		sleep 0.5
+		waited=$((waited + 1))
+	done
+	dillo >>"$RUN_DIR/dillo.log" 2>&1 &
+	dillo_pid=$!
+	waited=0
+	until xprop -name 'Dillo: Welcome to emulate.computer' WM_STATE 2>/dev/null | grep -q Normal; do
+		[ "$waited" -lt 120 ] || die "browser did not become ready"
+		kill -0 "$dillo_pid" 2>/dev/null || die "browser exited"
+		sleep 0.5
+		waited=$((waited + 1))
+	done
+	set_state ready
+
+}
+
+stop() {
+	for client in xterm dillo xcalc xclock xeyes adie PathFinder ace-solitaire ace-minesweeper xtris; do
+		kill_by_name "$client"
+	done
+	kill_by_name fluxbox
+
+	if pid="$(server_pid)"; then
+		kill "$pid" 2>/dev/null || true
+		waited=0
+		while [ -d "/proc/$pid" ] && [ "$waited" -lt 50 ]; do
+			sleep 0.1
+			waited=$((waited + 1))
+		done
+		if [ -d "/proc/$pid" ]; then
+			kill -9 "$pid" 2>/dev/null || true
+		fi
+		rm -f "$SOCKET" "$LOCK" 2>/dev/null || true
+		echo "emuctl desktop: stopped"
+	else
+		echo "emuctl desktop: not running"
+	fi
+	rm -f "$PID_FILE"
+	set_state stopped
+}
+
+status() {
+	if pid="$(server_pid)"; then
+		echo "Xfbdev running, pid $pid, display $DISPLAY_NUM"
+	else
+		echo "Xfbdev not running"
+	fi
+	find_input_devices
+	echo "framebuffer: $([ -c /dev/fb0 ] && echo "/dev/fb0 $(screen_geometry || echo '?')" || echo 'absent')"
+	echo "keyboard:    ${KEYBOARD:-absent} ${KEYBOARD_NAME}"
+	echo "pointer:     ${POINTER:-absent} ${POINTER_NAME}"
+	if [ -f "$LOG_FILE" ]; then
+		echo "log:         $LOG_FILE"
+	fi
+	exit 0
+}
+
+report_status() {
+	state=stopped
+	if [ -f "$RUN_DIR/state" ]; then
+		IFS= read -r state < "$RUN_DIR/state" || state=stopped
+	fi
+	if [ "$state" = ready ]; then
+		if ! server_pid >/dev/null ||
+			! IFS= read -r wm_pid 2>/dev/null < "$RUN_DIR/wm.pid" ||
+			! kill -0 "$wm_pid" 2>/dev/null; then
+			set_state failed
+			state=failed
+		fi
+	fi
+	report "$state"
+	address="$(ip -4 -o addr show dev eth0 2>/dev/null || true)"
+	set -- $address
+	[ ! -c /dev/hvc0 ] || printf '0 network %s\n' "${4:-none}" > /dev/hvc0
+}
+
+monitor() {
+	while true; do
+		report_status
+		# Repeat the handshake so a restored snapshot can attach a new host.
+		printf '0 ready\n' > /dev/hvc0
+		sleep 3
+	done
+}
+
+serve() {
+	export HOME=/root USER=root LOGNAME=root SHELL=/bin/bash
+	cd "$HOME"
+	exec >>/tmp/emuctl-control.log 2>&1
+	while [ ! -c /dev/hvc0 ]; do sleep 1; done
+	exec 3<>/dev/hvc0
+	stty -F /dev/hvc0 raw -echo
+	monitor &
+	monitor_pid=$!
+	trap 'kill "$monitor_pid" 2>/dev/null || true' EXIT
+	while read -r request action extra <&3; do
+		case "$request" in ''|*[!0-9]*) continue ;; esac
+		[ "${#request}" -le 16 ] || continue
+		result=error
+		if [ -z "$extra" ]; then
+			case "$action" in
+			desktop.start) "$0" desktop start && result=ok ;;
+			desktop.stop) "$0" desktop stop && result=ok ;;
+			network.connect) "$0" net connect && result=ok ;;
+			network.disconnect) "$0" net disconnect && result=ok ;;
+			status) result=ok ;;
+			esac
+		fi
+		report_status
+		printf '%s %s\n' "$request" "$result" >&3
+	done
+}
+
+desktop() {
+	[ "$#" -le 1 ] || { usage >&2; return 2; }
+	case "${1:-start}" in
+	start) start ;;
+	stop) stop ;;
+	restart) stop; start ;;
+	status) status ;;
+	boot)
+		HOME=/root
+		USER=root
+		LOGNAME=root
+		SHELL=/bin/bash
+		export HOME USER LOGNAME SHELL
+		cd "$HOME"
+		case " $(cat /proc/cmdline) " in
+		*" emulate.desktop=auto "*) "$0" desktop start >/tmp/desktop-boot.log 2>&1 & ;;
+		esac
+		;;
+	-h|--help|help) usage ;;
+	*) usage >&2; return 2 ;;
+	esac
+}
+
+net() {
+	[ "$#" -le 1 ] || { usage >&2; return 2; }
+	case "${1:-help}" in
+	connect)
+		stop_network
+		ip link set eth0 up
+		udhcpc -i eth0 -b -p "$NET_PID_FILE" -t 3 -T 1 -A 2
+		ip -4 addr show dev eth0
+		;;
+	disconnect)
+		stop_network
+		ip link set eth0 down
+		ip addr flush dev eth0
+		ip route flush dev eth0
+		report_status
+		echo "Disconnected eth0"
+		;;
+	-h|--help|help) usage ;;
+	*) usage >&2; return 2 ;;
+	esac
+}
+
+stop_network() {
+	if [ -f "$NET_PID_FILE" ] && IFS= read -r net_pid < "$NET_PID_FILE"; then
+		kill "$net_pid" 2>/dev/null || true
+	fi
+	rm -f "$NET_PID_FILE"
+}
+
+usage() {
+	cat <<'HELP'
+Usage: emuctl <command> [subcommand]
+
+  desktop           Manage the graphical session
+    start           Start the desktop (default)
+    stop            Stop the desktop
+    restart         Restart the desktop
+    status          Show desktop status
+
+  net               Manage networking
+    connect         Bring up eth0 and request a DHCP lease
+    disconnect      Clear addresses/routes and bring eth0 down
+
+  -h, --help        Show this help
+HELP
+}
+
+command="${1:-help}"
+[ "$#" -eq 0 ] || shift
+case "$command" in
+serve) serve ;;
+desktop) desktop "$@" ;;
+net) net "$@" ;;
+-h|--help|help) usage ;;
+*) usage >&2; exit 2 ;;
+esac

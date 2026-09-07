@@ -1,0 +1,24 @@
+# System-wide shell environment for the persistent Alpine root.
+#
+# Read by the root login shell. Not shared with initramfs/profile, which has
+# neither bash nor a real /etc/passwd to reason about.
+export PATH=/usr/local/bin:/usr/local/sbin:/bin:/sbin:/usr/bin:/usr/sbin
+export PAGER=less
+
+# This file replaces Alpine's /etc/profile, so it sources the drop-ins itself
+# (packages install into /etc/profile.d).
+for _drop_in in /etc/profile.d/*.sh; do
+    [ -r "$_drop_in" ] && . "$_drop_in"
+done
+unset _drop_in
+
+uname -a
+
+if [ -n "${BASH_VERSION:-}" ]; then
+    # PS1 lives in ~/.bashrc so that non-login interactive shells get it too.
+    [ -r "$HOME/.bashrc" ] && . "$HOME/.bashrc"
+else
+    # BusyBox ash understands \w and \$ but not \u/\H.
+    PS1='root@emulate.computer:\w \$ '
+    cat /etc/motd 2>/dev/null
+fi

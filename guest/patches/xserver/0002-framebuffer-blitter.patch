@@ -1,0 +1,268 @@
+--- a/fb/fb.h
++++ b/fb/fb.h
+@@ -498,6 +498,12 @@
+ /*
+  * fbblt.c
+  */
++extern _X_EXPORT Bool (*fbCopyAccelerated)(FbBits *, FbStride, int,
++                                         FbBits *, FbStride, int,
++                                         int, int, FbBits);
++extern _X_EXPORT Bool (*fbSolidAccelerated)(FbBits *, FbStride, int,
++                                          int, int, FbBits, FbBits);
++
+ extern _X_EXPORT void
+
+ fbBlt(FbBits * src,
+--- a/fb/fbblt.c
++++ b/fb/fbblt.c
+@@ -64,6 +64,9 @@
+     } \
+ }
+
++Bool (*fbCopyAccelerated)(FbBits *, FbStride, int, FbBits *, FbStride, int,
++                          int, int, FbBits) = NULL;
++
+ void
+ fbBlt(FbBits * srcLine,
+       FbStride srcStride,
+@@ -84,6 +87,11 @@
+
+     FbDeclareMergeRop();
+
++    if (fbCopyAccelerated && alu == GXcopy && bpp == 32 &&
++        fbCopyAccelerated(srcLine, srcStride, srcX, dstLine, dstStride, dstX,
++                          width, height, pm))
++        return;
++
+     if (alu == GXcopy && pm == FB_ALLONES &&
+         !(srcX & 7) && !(dstX & 7) && !(width & 7))
+     {
+--- a/fb/fbsolid.c
++++ b/fb/fbsolid.c
+@@ -26,6 +26,9 @@
+
+ #include "fb.h"
+
++Bool (*fbSolidAccelerated)(FbBits *, FbStride, int, int, int,
++                           FbBits, FbBits) = NULL;
++
+ void
+ fbSolid(FbBits * dst,
+         FbStride dstStride,
+@@ -34,6 +37,10 @@
+     FbBits startmask, endmask;
+     int n, nmiddle;
+     int startbyte, endbyte;
++
++    if (fbSolidAccelerated && bpp == 32 &&
++        fbSolidAccelerated(dst, dstStride, dstX, width, height, and, xor))
++        return;
+
+     dst += dstX >> FB_SHIFT;
+     dstX &= FB_MASK;
+--- a/fb/fbcopy.c
++++ b/fb/fbcopy.c
+@@ -50,6 +50,16 @@
+     fbGetDrawable(pDstDrawable, dst, dstStride, dstBpp, dstXoff, dstYoff);
+
+     while (nbox--) {
++        if (fbCopyAccelerated && alu == GXcopy && srcBpp == 32 && dstBpp == 32 &&
++            fbCopyAccelerated(src + (pbox->y1 + dy + srcYoff) * srcStride,
++                              srcStride, (pbox->x1 + dx + srcXoff) * srcBpp,
++                              dst + (pbox->y1 + dstYoff) * dstStride,
++                              dstStride, (pbox->x1 + dstXoff) * dstBpp,
++                              (pbox->x2 - pbox->x1) * dstBpp,
++                              pbox->y2 - pbox->y1, pm)) {
++            pbox++;
++            continue;
++        }
+ #ifndef FB_ACCESS_WRAPPER       /* pixman_blt() doesn't support accessors yet */
+         if (pm == FB_ALLONES && alu == GXcopy && !reverse && !upsidedown) {
+             if (!pixman_blt
+--- a/fb/fbfill.c
++++ b/fb/fbfill.c
+@@ -81,6 +81,11 @@
+
+     switch (pGC->fillStyle) {
+     case FillSolid:
++        if (fbSolidAccelerated && dstBpp == 32 &&
++            fbSolidAccelerated(dst + (y + dstYoff) * dstStride, dstStride,
++                               (x + dstXoff) * dstBpp, width * dstBpp, height,
++                               pPriv->and, pPriv->xor))
++            break;
+ #ifndef FB_ACCESS_WRAPPER
+         if (pPriv->and || !pixman_fill((uint32_t *) dst, dstStride, dstBpp,
+                                        x + dstXoff, y + dstYoff,
+@@ -220,6 +225,12 @@
+             continue;
+
+ #ifndef FB_ACCESS_WRAPPER
++        if (fbSolidAccelerated && dstBpp == 32 &&
++            fbSolidAccelerated(dst + (partY1 + dstYoff) * dstStride, dstStride,
++                               (partX1 + dstXoff) * dstBpp,
++                               (partX2 - partX1) * dstBpp, partY2 - partY1,
++                               and, xor))
++            continue;
+         if (and || !pixman_fill((uint32_t *) dst, dstStride, dstBpp,
+                                 partX1 + dstXoff, partY1 + dstYoff,
+                                 (partX2 - partX1), (partY2 - partY1), xor))
+--- a/hw/kdrive/fbdev/fbdev.c
++++ b/hw/kdrive/fbdev/fbdev.c
+@@ -24,6 +24,7 @@
+
+ #include <sys/ioctl.h>
+ #include <errno.h>
++#include <stdint.h>
+
+ #include "fb/fb_priv.h"
+ #include "os/osdep.h"
+@@ -35,6 +36,117 @@
+ #endif
+
+ const char *fbdevDevicePath = NULL;
++
++#define EMU_FB_STRIDE 4096
++#define EMU_FB_SIZE (EMU_FB_STRIDE * 768)
++
++static volatile CARD32 *emuBlitter;
++static uintptr_t emuFramebuffer;
++static void *emuFramebufferMapping;
++
++enum { EMU_ID, EMU_COMMAND, EMU_SOURCE, EMU_DESTINATION,
++       EMU_WIDTH, EMU_HEIGHT, EMU_AND, EMU_XOR };
++
++static Bool
++emuOffset(FbBits *bits, FbStride stride, int x, CARD32 *offset)
++{
++    uintptr_t address = (uintptr_t) bits;
++    if (stride != EMU_FB_STRIDE / sizeof(FbBits) || x < 0 || (x & 31) ||
++        address < emuFramebuffer || address - emuFramebuffer >= EMU_FB_SIZE ||
++        (unsigned) (x >> 3) >= EMU_FB_SIZE - (address - emuFramebuffer))
++        return FALSE;
++    *offset = address - emuFramebuffer + (x >> 3);
++    return TRUE;
++}
++
++static Bool
++emuRectangle(int width, int height)
++{
++    return width > 0 && width <= EMU_FB_STRIDE * 8 && !(width & 31) &&
++           height > 0 && height <= 768;
++}
++
++static Bool
++emuCopy(FbBits *src, FbStride srcStride, int srcX,
++        FbBits *dst, FbStride dstStride, int dstX,
++        int width, int height, FbBits pm)
++{
++    CARD32 source, destination;
++    if (!emuRectangle(width, height) ||
++        !emuOffset(src, srcStride, srcX, &source) ||
++        !emuOffset(dst, dstStride, dstX, &destination))
++        return FALSE;
++    emuBlitter[EMU_SOURCE] = source;
++    emuBlitter[EMU_DESTINATION] = destination;
++    emuBlitter[EMU_WIDTH] = width >> 3;
++    emuBlitter[EMU_HEIGHT] = height;
++    emuBlitter[EMU_AND] = pm;
++    __sync_synchronize();
++    emuBlitter[EMU_COMMAND] = 1;
++    __sync_synchronize();
++    return emuBlitter[EMU_COMMAND] == 0;
++}
++
++static Bool
++emuSolid(FbBits *dst, FbStride dstStride, int dstX,
++         int width, int height, FbBits and, FbBits xor)
++{
++    CARD32 destination;
++    if (!emuRectangle(width, height) ||
++        !emuOffset(dst, dstStride, dstX, &destination))
++        return FALSE;
++    emuBlitter[EMU_DESTINATION] = destination;
++    emuBlitter[EMU_WIDTH] = width >> 3;
++    emuBlitter[EMU_HEIGHT] = height;
++    emuBlitter[EMU_AND] = and;
++    emuBlitter[EMU_XOR] = xor;
++    __sync_synchronize();
++    emuBlitter[EMU_COMMAND] = 2;
++    __sync_synchronize();
++    return emuBlitter[EMU_COMMAND] == 0;
++}
++
++static void
++emuAccelInit(FbdevPriv *priv)
++{
++    int fd;
++    void *mapping;
++    if (priv->var.bits_per_pixel != 32 || priv->fix.line_length != EMU_FB_STRIDE ||
++        priv->var.xres != 1024 || priv->var.yres != 768 ||
++        access("/proc/device-tree/soc/blitter@10006000/compatible", R_OK) != 0)
++        return;
++    if (!emuBlitter) {
++        fd = open("/dev/mem", O_RDWR | O_SYNC);
++        if (fd < 0)
++            return;
++        mapping = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0x10006000);
++        if (mapping == MAP_FAILED) {
++            close(fd);
++            return;
++        }
++        if (((volatile CARD32 *) mapping)[EMU_ID] != 0x45464201) {
++            munmap(mapping, 4096);
++            close(fd);
++            return;
++        }
++        emuFramebufferMapping = mmap(NULL, EMU_FB_SIZE, PROT_READ | PROT_WRITE,
++                                     MAP_SHARED, fd, 0x87c00000);
++        close(fd);
++        if (emuFramebufferMapping == MAP_FAILED) {
++            emuFramebufferMapping = NULL;
++            munmap(mapping, 4096);
++            return;
++        }
++        emuBlitter = mapping;
++        ErrorF("emulate framebuffer copy/fill acceleration enabled\n");
++    }
++    /* simpledrm's /dev/fb0 mapping is a deferred-I/O shadow, not scanout RAM. */
++    priv->fb = emuFramebufferMapping;
++    emuFramebuffer = (uintptr_t) priv->fb;
++    fbCopyAccelerated = emuCopy;
++    fbSolidAccelerated = emuSolid;
++}
++
+
+ static Bool
+ fbdevInitialize(KdCardInfo * card, FbdevPriv * priv)
+@@ -358,6 +470,8 @@
+     screen->width = priv->var.xres;
+     screen->height = priv->var.yres;
+
++    fbCopyAccelerated = NULL;
++    fbSolidAccelerated = NULL;
+     if (scrpriv->shadow) {
+         if (!KdShadowFbAlloc(screen,
+                              scrpriv->randr & (RR_Rotate_90 | RR_Rotate_270)))
+@@ -367,6 +481,7 @@
+         screen->fb.byteStride = priv->fix.line_length;
+         screen->fb.pixelStride = (priv->fix.line_length * 8 /
+                                   priv->var.bits_per_pixel);
++        emuAccelInit(priv);
+         screen->fb.frameBuffer = (CARD8 *) (priv->fb);
+     }
+
+@@ -823,6 +938,14 @@
+ {
+     FbdevPriv *priv = card->driver;
+
++    fbCopyAccelerated = NULL;
++    fbSolidAccelerated = NULL;
++    if (emuBlitter) {
++        munmap((void *) emuBlitter, 4096);
++        emuBlitter = NULL;
++        munmap(emuFramebufferMapping, EMU_FB_SIZE);
++        emuFramebufferMapping = NULL;
++    }
+     munmap(priv->fb_base, priv->fix.smem_len);
+     close(priv->fd);
+     free(priv);

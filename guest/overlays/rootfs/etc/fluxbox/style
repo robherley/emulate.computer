@@ -1,0 +1,73 @@
+background: unset
+*.font: fixed
+*.justify: Left
+*.borderWidth: 1
+*.borderColor: #303030
+*.bevelWidth: 0
+window.title.height: 26
+window.handleWidth: 3
+window.title.focus: Flat Solid
+window.title.focus.color: #252525
+window.title.unfocus: Flat Solid
+window.title.unfocus.color: #1c1c1c
+window.label.focus: ParentRelative
+window.label.focus.textColor: #ededed
+window.label.unfocus: ParentRelative
+window.label.unfocus.textColor: #a1a1a1
+window.button.focus: ParentRelative
+window.button.focus.picColor: #ededed
+window.button.unfocus: ParentRelative
+window.button.unfocus.picColor: #a1a1a1
+window.button.pressed: Flat Solid
+window.button.pressed.color: #284769
+window.handle.focus: Flat Solid
+window.handle.focus.color: #252525
+window.handle.unfocus: Flat Solid
+window.handle.unfocus.color: #1c1c1c
+window.grip.focus: Flat Solid
+window.grip.focus.color: #555555
+window.grip.unfocus: Flat Solid
+window.grip.unfocus.color: #303030
+window.focus.borderColor: #555555
+menu.title: Flat Solid
+menu.title.color: #252525
+menu.title.textColor: #ededed
+menu.frame: Flat Solid
+menu.frame.color: #181818
+menu.frame.textColor: #ededed
+menu.frame.disableColor: #808080
+menu.hilite: Flat Solid
+menu.hilite.color: #284769
+menu.hilite.textColor: #ffffff
+menu.itemHeight: 24
+menu.titleHeight: 26
+menu.bullet: triangle
+menu.bullet.position: Right
+toolbar: Flat Solid
+toolbar.color: #121212
+toolbar.borderWidth: 0
+toolbar.button: Flat Solid
+toolbar.button.color: #181818
+toolbar.button.picColor: #ededed
+toolbar.button.pressed: Flat Solid
+toolbar.button.pressed.color: #284769
+toolbar.clock: Flat Solid
+toolbar.clock.color: #121212
+toolbar.clock.textColor: #ededed
+toolbar.iconbar.focused: Flat Solid
+toolbar.iconbar.focused.color: #284769
+toolbar.iconbar.focused.textColor: #ffffff
+toolbar.iconbar.unfocused: Flat Solid
+toolbar.iconbar.unfocused.color: #181818
+toolbar.iconbar.unfocused.textColor: #b8b8b8
+toolbar.iconbar.borderWidth: 0
+
+window.close.pixmap: /etc/fluxbox/buttons/close.xpm
+window.close.unfocus.pixmap: /etc/fluxbox/buttons/close.unfocus.xpm
+window.close.pressed.pixmap: /etc/fluxbox/buttons/close.pressed.xpm
+window.maximize.pixmap: /etc/fluxbox/buttons/maximize.xpm
+window.maximize.unfocus.pixmap: /etc/fluxbox/buttons/maximize.unfocus.xpm
+window.maximize.pressed.pixmap: /etc/fluxbox/buttons/maximize.pressed.xpm
+window.iconify.pixmap: /etc/fluxbox/buttons/iconify.xpm
+window.iconify.unfocus.pixmap: /etc/fluxbox/buttons/iconify.unfocus.xpm
+window.iconify.pressed.pixmap: /etc/fluxbox/buttons/iconify.pressed.xpm
