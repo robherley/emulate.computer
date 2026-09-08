@@ -33,7 +33,7 @@ recipe, patches, or Alpine base invalidate the manifest. Freedoom data remains
 a checksum-verified download. See [prebuilt binaries](../guest/prebuilt/README.md).
 
 The build requires jq and Docker Buildx with `linux/riscv64` emulation; snapshot capture
-also requires Rust. [build-alpine-rootfs.sh](../scripts/build-alpine-rootfs.sh)
+also requires Rust. [build-rootfs.sh](../scripts/build-rootfs.sh)
 formats a sparse 512 MiB `guest/out/alpine-rootfs.ext4` from the tar using a pinned
 native-architecture container. Fixed ownership, timestamps, filesystem UUIDs,
 and formatting inputs make the disk reproducible for unchanged input content.
@@ -114,7 +114,7 @@ and [Wasm disk backend](../crates/emulate-wasm/src/disk.rs).
 
 ## Snapshot capture
 
-[build-snapshot.sh](../scripts/build-snapshot.sh) produces a console snapshot at
+[capture-snapshot.sh](../scripts/capture-snapshot.sh) produces a console snapshot at
 `guest/out/snapshot.bin` and a graphical snapshot at
 `guest/out/snapshot-desktop.bin`. The graphical snapshot is compressed and
 published as `web/public/guest/snapshot.bin.gz`.

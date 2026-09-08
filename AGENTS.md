@@ -54,7 +54,7 @@ for meaningful behavior and regressions rather than mirroring implementation.
 | Change | Verification |
 | --- | --- |
 | Rust | `just check` and relevant `cargo test -p <crate> --locked`; `just test` runs the workspace |
-| Web | `just test-web`, `npm run typecheck --prefix web`, `npm run build --prefix web` |
+| Web | `just test-web`, `just typecheck`, `just site` |
 | Rust used by the browser | `just web-build` rebuilds Wasm and the web app |
 | Relay | `just test-relay` |
 | CPU/privilege semantics | Relevant ISA/ACT4 tests; see preparation below |
@@ -64,7 +64,7 @@ for meaningful behavior and regressions rather than mirroring implementation.
 Use `mise install` for the pinned repo tools in `mise.toml`; activate mise or
 prefix commands with `mise exec --`. Docker remains a separate prerequisite.
 Run `npm ci` at the repository root to install both workspaces. The web uses
-Node 24+ for tests; the relay uses Bun. `npm run typecheck` checks both hosts and
+Node 24+ for tests; the relay uses Bun. `just typecheck` checks both hosts and
 API entrypoints. Native network tests bind localhost sockets. The Redis integration test requires `REDIS_URL`.
 Explain environment-related failures separately from test regressions.
 
@@ -92,8 +92,9 @@ manifest, and checksums together. `bash scripts/prebuilt.sh verify` checks fresh
 assets, and captures boot snapshots. It requires jq, Docker Buildx with RISC-V
 emulation and a Rust toolchain. `just guest-snapshot` recaptures existing artifacts.
 Rebuild the web app after publishing guest assets when using the production preview.
-`npm run build` uses Bash, jq, and shasum to build Wasm, verifies the guest artifact pairing, generates the
-asset manifest, and builds Vite. Actions publishes the heavy build as a GitHub release; Vercel downloads the
+`just build` runs: Wasm, asset preparation, and the frontend.
+`just build-all` also builds the guest disk and captures snapshots. Individual
+stages and their inputs/outputs are listed in [scripts/README.md](scripts/README.md). Actions publishes the heavy build as a GitHub release; Vercel downloads the
 pinned `ASSET_RELEASE` and builds the frontend remotely. See README.
 
 Disk identity is `sha256:<hash>` of the uncompressed ext4 seed, published through

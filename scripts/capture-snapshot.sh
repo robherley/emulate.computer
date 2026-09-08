@@ -10,9 +10,9 @@ image="guest/out/alpine-rootfs.ext4"
 out="guest/out/snapshot.bin"
 seed="web/public/guest/snapshot.bin.gz"
 
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "error: cargo is required to capture the post-boot snapshot" >&2
-  echo "install Rust (https://rustup.rs) and retry, or set ROOTFS_SKIP_SNAPSHOT=1" >&2
+cli="${EMULATE_CLI:-target/release/emulate-computer}"
+if [[ ! -x "$cli" ]]; then
+  echo "error: $cli is missing; run just cli first" >&2
   exit 2
 fi
 
@@ -34,7 +34,7 @@ fi
 disk_id="sha256:$seed_hash"
 
 echo "capturing console and desktop snapshots (two guest boots) ..."
-cargo run --release --quiet -p emulate-cli -- snapshot \
+"$cli" snapshot \
   --bios guest/out/fw.bin \
   --kernel guest/out/Image \
   --initrd guest/out/initramfs.cpio.gz \
@@ -44,7 +44,7 @@ cargo run --release --quiet -p emulate-cli -- snapshot \
   --out "$out"
 
 out="guest/out/snapshot-desktop.bin"
-cargo run --release --quiet -p emulate-cli -- snapshot \
+"$cli" snapshot \
   --bios guest/out/fw.bin \
   --kernel guest/out/Image \
   --initrd guest/out/initramfs.cpio.gz \
@@ -52,8 +52,7 @@ cargo run --release --quiet -p emulate-cli -- snapshot \
   --disk "$image" --disk-id "$disk_id" --desktop --out "$out"
 
 mkdir -p web/public/guest
-# -n drops the timestamp and source name; the container is not reproducible
-# anyway, but a stable gzip envelope keeps diffs about the payload.
+# Keep gzip metadata stable; the snapshot itself contains runtime clock state.
 gzip -9 -n -c guest/out/snapshot-desktop.bin > "$seed.tmp"
 mv -f "$seed.tmp" "$seed"
 echo "wrote $seed ($(du -h "$seed" | cut -f1) compressed)"

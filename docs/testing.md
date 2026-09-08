@@ -139,7 +139,7 @@ correctness test or a substitute for interactive display verification.
 
 ## Relay deployment checks
 
-Run `npm ci` at the root and `npm run typecheck` after preparing guest artifacts.
+Run `npm ci` at the root and `just typecheck` after preparing guest artifacts.
 Use `just test-web` for the Node suite and
 `REDIS_URL=redis://127.0.0.1:6379 just test-relay` for the complete Bun suite with
 an isolated Redis database. Without Redis, shared-counter integration tests

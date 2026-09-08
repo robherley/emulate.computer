@@ -106,7 +106,7 @@ export function resolveNetConfig(envRelayUrl?: string): NetConfig {
   return { mode: "none" };
 }
 
-// Must match size_mb in scripts/build-alpine-rootfs.sh.
+// Must match size_mb in scripts/build-rootfs.sh.
 export const DISK_LOGICAL_BYTES = 512 * 1024 * 1024;
 
 

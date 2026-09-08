@@ -9,12 +9,6 @@
   "engines": {
     "node": ">=24"
   },
-  "scripts": {
-    "relay": "npm run start --workspace relay",
-    "build": "bash scripts/build-site.sh",
-    "build:release": "just guest-rootfs && npm run build && bash scripts/release-assets.sh pack",
-    "typecheck": "tsc --noEmit && npm run typecheck --workspace web"
-  },
   "devDependencies": {
     "@types/bun": "^1.3.0",
     "typescript": "^5.6.0"

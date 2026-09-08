@@ -13,6 +13,8 @@ Guest and conformance suites have explicit preparation and execution commands in
 
 ## Documentation
 
+- [Build stages](scripts/README.md): local commands, stage inputs, and outputs.
+
 - [Emulation](docs/emulation.md): CPU, platform devices, guest control, and performance optimizations.
 - [Testing](docs/testing.md): instruction compliance, emulator tests, and browser verification.
 - [Disk](docs/disk.md): rootfs builds, installed software, session storage, and snapshots.

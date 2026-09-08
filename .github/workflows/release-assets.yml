@@ -28,10 +28,25 @@ jobs:
           key: guest-${{ runner.os }}-${{ hashFiles('guest/**') }}
           restore-keys: guest-${{ runner.os }}-
       - run: npm ci
-      - run: npm run build:release
+      - name: Build guest files
+        run: bash scripts/build-guest.sh
         env:
           GUEST_BUILD_CACHE: ${{ runner.temp }}/guest-build-cache
-      - run: npm run typecheck && npm test --workspace web
+      - name: Format guest disk
+        run: bash scripts/build-rootfs.sh
+      - name: Build native emulator
+        run: just cli
+      - name: Build browser emulator
+        run: just wasm
+      - name: Capture snapshots
+        run: bash scripts/capture-snapshot.sh
+      - name: Prepare site assets
+        run: bash scripts/prepare-site.sh
+      - name: Build site
+        run: bash scripts/build-site.sh
+      - name: Package release assets
+        run: bash scripts/release-assets.sh pack
+      - run: just typecheck test-web
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

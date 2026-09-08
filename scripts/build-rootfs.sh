@@ -1,24 +1,5 @@
 #!/usr/bin/env bash
-# Turn guest/out/rootfs.tar into guest/out/alpine-rootfs.ext4, and install its
-# gzipped browser seed into web/public/guest/rootfs.ext4.gz.
-#
-# The root filesystem's *content* is built by the `rootfs` stage of
-# guest/Dockerfile (packages and the /etc overlay) and handed
-# over as guest/out/rootfs.tar by `scripts/fetch-guest.sh`. All this script owns
-# is the filesystem: normalization, mke2fs, gzip and content identity.
-#
-# The mke2fs step runs in a pinned native-architecture Alpine container, via
-# scripts/build-alpine-rootfs-container.sh, so macOS needs neither root nor host
-# e2fsprogs.
-#
-# The image is byte-reproducible for an unchanged tar; ROOTFS_VERIFY_REPRODUCIBLE=1
-# formats twice and compares SHA-256. The post-boot snapshot installed at the
-# end is deliberately outside that property: it carries a wall clock and a timer
-# value, so it is deterministic in behaviour but not byte-identical between
-# runs. The ext4 stays reproducible because the capture runs on a scratch copy. Upstream is the one thing not pinnable:
-# Alpine rebuilding a package at a new -rN changes the content, which the pinned
-# top-level versions in guest/Dockerfile turn into a build failure rather than
-# silent drift.
+# Format the guest rootfs tar as ext4 and publish its compressed browser seed.
 
 set -euo pipefail
 
@@ -68,8 +49,8 @@ if [[ "${ROOTFS_REUSE_IMAGE:-0}" == "1" && -f "$image" ]]; then
   echo "reusing existing guest/out/alpine-rootfs.ext4"
 else
   if [[ ! -f "$rootfs_tar" ]]; then
-    echo "guest/out/rootfs.tar is missing; building the guest artifacts first ..."
-    bash "$root/scripts/fetch-guest.sh"
+    echo "error: guest/out/rootfs.tar is missing; run just guest first" >&2
+    exit 2
   fi
   make_ext4 "$rootfs_tar" "$image"
 fi
@@ -101,9 +82,5 @@ mv -f "$root/web/public/guest/rootfs.sha256.tmp" "$root/web/public/guest/rootfs.
 cp "$root/guest/out/virt-rootfs.dtb" "$root/web/public/guest/dtb-rootfs.bin"
 echo "wrote web/public/guest/rootfs.ext4.gz ($(du -h "$seed" | cut -f1) compressed; sha256:$seed_hash)"
 
-if [[ "${ROOTFS_SKIP_SNAPSHOT:-0}" == "1" ]]; then
-  rm -f "$root/web/public/guest/snapshot.bin.gz"
-  echo "note: ROOTFS_SKIP_SNAPSHOT=1, not capturing a boot snapshot"
-else
-  bash "$root/scripts/build-snapshot.sh"
-fi
+# A newly published disk must receive a matching snapshot before site preparation.
+rm -f "$root/web/public/guest/snapshot.bin.gz"

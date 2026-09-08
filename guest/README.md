@@ -92,8 +92,8 @@ verifies the game data and installs its license and credits.
 | `initramfs.cpio.gz` | `initramfs` stage: BusyBox, kernel modules, and initramfs overlay |
 | `virt.dtb`, `virt-rootfs.dtb`, `virt-desktop.dtb` | `dtb` stage: `dts/build.sh` and `dts/virt.dts` |
 | `rootfs.tar` | `rootfs-tar` stage: Alpine packages and rootfs overlay |
-| `alpine-rootfs.ext4` | `scripts/build-alpine-rootfs.sh`: reproducible filesystem from the tar |
-| `snapshot.bin`, `snapshot-desktop.bin` | `scripts/build-snapshot.sh`: post-boot state captured on a scratch disk copy |
+| `alpine-rootfs.ext4` | `scripts/build-rootfs.sh`: reproducible filesystem from the tar |
+| `snapshot.bin`, `snapshot-desktop.bin` | `scripts/capture-snapshot.sh`: post-boot state captured on a scratch disk copy |
 
 `virt.dtb` boots into the initramfs. `virt-rootfs.dtb` adds
 `emulate.root=/dev/vda` to switch onto the disk. `virt-desktop.dtb` also starts the graphical desktop.
@@ -108,7 +108,7 @@ the published seed; run `just guest-rootfs` to rebuild the seed and snapshots.
 
 `ROOTFS_VERIFY_REPRODUCIBLE=1 just guest-rootfs` formats the ext4 image twice
 and compares hashes. `ROOTFS_REUSE_IMAGE=1` reuses an existing image;
-`ROOTFS_SKIP_SNAPSHOT=1` skips snapshot capture. Fixed timestamps, ownership,
+`just guest-disk` formats the disk without capturing a snapshot. Fixed timestamps, ownership,
 and filesystem identifiers make ext4 reproducible for an unchanged input tar;
 snapshots contain runtime clock state and are not byte-reproducible.
 

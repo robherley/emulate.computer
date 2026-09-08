@@ -27,7 +27,7 @@ pub const RELAY_URL_ENV: &str = "EMULATE_RELAY_URL";
 
 /// What a relay that cannot be reached should tell the user.
 fn unreachable(url: &str, error: &str) -> String {
-    format!("cannot reach relay at {url}: {error}; start one with 'npm run relay'")
+    format!("cannot reach relay at {url}: {error}; start one with 'just relay'")
 }
 
 /// Fail early if nothing is listening at `url`, so a boot reports a missing
@@ -94,7 +94,7 @@ mod tests {
             .port();
         let error = check_relay(&format!("ws://127.0.0.1:{port}")).expect_err("nothing listening");
         assert!(error.starts_with(&format!("cannot reach relay at ws://127.0.0.1:{port}: ")));
-        assert!(error.ends_with("start one with 'npm run relay'"), "{error}");
+        assert!(error.ends_with("start one with 'just relay'"), "{error}");
     }
 
     #[test]

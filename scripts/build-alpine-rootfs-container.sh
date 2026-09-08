@@ -1,5 +1,5 @@
 #!/bin/sh
-# Container-side half of build-alpine-rootfs.sh: $1 is the flattened root tree
+# Container-side half of build-rootfs.sh: $1 is the flattened root tree
 # produced by the `rootfs-tar` stage of guest/Dockerfile, $2 the ext4 image to
 # write.
 #
