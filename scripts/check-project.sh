@@ -6,6 +6,8 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
+bash scripts/prebuilt.sh verify
+
 cargo fmt --all -- --check
 just --fmt --check
 

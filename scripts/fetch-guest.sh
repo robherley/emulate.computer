@@ -1,19 +1,12 @@
 #!/usr/bin/env bash
-# Build every guest artifact from guest/Dockerfile into guest/out, and install
-# the browser's copies into web/public/guest.
-#
-# All the work happens in the `out` stage of guest/Dockerfile; this is only the
-# invocation plus the install. Docker with linux/riscv64 emulation registered is
-# the sole host prerequisite — no curl, shasum, dtc or python.
-#
-# guest/out/rootfs.tar is also produced here; scripts/build-alpine-rootfs.sh
-# turns it into the ext4 image, which is why `just guest-rootfs` depends on
-# `just guest`.
+# Build guest images using verified prebuilt desktop binaries, then stage browser assets.
 
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
+
+bash scripts/prebuilt.sh verify
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "error: docker is required to build the guest artifacts" >&2
@@ -27,16 +20,15 @@ if ! docker buildx version >/dev/null 2>&1; then
 fi
 
 mkdir -p guest/out
-cache_args=()
+build_args=(--platform linux/riscv64 --target out --output type=local,dest=guest/out)
 if [[ -n "${GUEST_BUILD_CACHE:-}" ]]; then
   if [[ -f "$GUEST_BUILD_CACHE/index.json" ]]; then
-    cache_args+=(--cache-from "type=local,src=$GUEST_BUILD_CACHE")
+    build_args+=(--cache-from "type=local,src=$GUEST_BUILD_CACHE")
   fi
   rm -rf "$GUEST_BUILD_CACHE-next"
-  cache_args+=(--cache-to "type=local,dest=$GUEST_BUILD_CACHE-next,mode=max")
+  build_args+=(--cache-to "type=local,dest=$GUEST_BUILD_CACHE-next,mode=max")
 fi
-if ! docker buildx build --platform linux/riscv64 \
-  --target out --output "type=local,dest=guest/out" "${cache_args[@]}" guest; then
+if ! docker buildx build "${build_args[@]}" guest; then
   echo "error: docker buildx build failed" >&2
   echo "riscv64 emulation must be registered; check: docker run --rm --platform linux/riscv64 alpine:3.22.5 uname -m" >&2
   exit 2

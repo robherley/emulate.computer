@@ -70,6 +70,10 @@ toolchain-image:
       --tag "${TOOLCHAIN_IMAGE:-emulate-riscv-toolchain:trixie}" \
       --load docker/riscv-toolchain
 
+# Rebuild and verify the checked-in desktop binary bundle.
+guest-prebuilt:
+    bash scripts/prebuilt.sh build
+
 # Fetch/build the Linux guest images (firmware, kernel, initramfs, DTBs) and install them into the web app.
 guest:
     bash scripts/fetch-guest.sh

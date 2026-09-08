@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit",
     "build:wasm": "wasm-pack build ../crates/emulate-wasm --target web --out-dir ../../web/src/wasm",
     "test": "node --test tests/*.test.ts",
-    "predev": "bun ../scripts/build-site.ts prepare",
-    "prebuild": "bun ../scripts/build-site.ts public"
+    "predev": "bash ../scripts/build-site.sh prepare",
+    "prebuild": "bash ../scripts/build-site.sh public"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",

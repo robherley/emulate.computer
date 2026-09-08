@@ -11,7 +11,7 @@
   },
   "scripts": {
     "relay": "npm run start --workspace relay",
-    "build": "bun scripts/build-site.ts",
+    "build": "bash scripts/build-site.sh",
     "build:release": "just guest-rootfs && npm run build && bash scripts/release-assets.sh pack",
     "typecheck": "tsc --noEmit && npm run typecheck --workspace web"
   },

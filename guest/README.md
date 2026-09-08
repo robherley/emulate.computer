@@ -8,6 +8,7 @@ Linux, a BusyBox initramfs, and an Alpine root filesystem with an optional deskt
 | Path | Purpose |
 | --- | --- |
 | `Dockerfile` | Pinned dependencies and build stages; `guest/` is the Docker context |
+| `prebuilt/` | Desktop binaries, source build recipe, and input/checksum manifest |
 | `dts/` | Machine description and compilation of three boot variants |
 | `overlays/initramfs/` | Initial userspace files, arranged by their installed paths |
 | `overlays/rootfs/` | Alpine configuration, commands, and desktop assets, arranged by their installed paths |
@@ -51,31 +52,36 @@ Run from the repository root:
 just guest          # firmware, kernel, initramfs, DTBs, rootfs.tar; install browser boot images
 just guest-rootfs   # also format ext4, install its browser seed, and capture a snapshot
 just guest-snapshot # capture a snapshot from existing artifacts
+just guest-prebuilt # rebuild the checked-in desktop binaries after source/patch changes
 ```
 
-The image build requires Docker Buildx with `linux/riscv64` emulation.
+The image build requires jq and Docker Buildx with `linux/riscv64` emulation.
 Snapshot capture also requires the Rust toolchain. To build one stage:
 
 ```sh
 docker buildx build --platform linux/riscv64 --target initramfs guest
-docker buildx build --platform linux/riscv64 --target xserver guest
+docker buildx build --platform linux/riscv64 --file guest/prebuilt/Dockerfile --target xserver guest
 docker buildx build --platform linux/riscv64 --target rootfs guest
 ```
 
-Versions live in the Dockerfile's `ARG`s. The Alpine base is pinned by digest,
-packages by version, and source tarballs by SHA-256. If Alpine replaces
-a pinned package, the build fails instead of silently selecting a newer one.
-XLibre 25.1.9 Xfbdev is built with Meson, without Mesa or LLVM. Its musl
-compatibility fix is upstream; the evdev absolute-pointer patch is still needed.
-Dillo opens the local project homepage at `file:///usr/share/emulate/index.html`.
-The `games` stage builds the selected Ace of Penguins games and standalone Xtris
-from checksum-pinned sources. They appear under the desktop's Games submenu.
+Normal image builds unpack the checked-in desktop bundle instead of compiling
+XLibre, Fluxbox, FOX, and the games. Both the host script and Docker build verify
+checksums; recipe, patch, or Alpine-base changes require `just guest-prebuilt`.
+Runtime library checks still reject missing dependencies and Mesa/LLVM.
+See [prebuilt/README.md](prebuilt/README.md) for regeneration and provenance.
+
+Runtime package versions live in `Dockerfile`; compiled component versions and
+build settings live in `prebuilt/Dockerfile`. Alpine bases are pinned by digest,
+runtime packages by version, and source tarballs by SHA-256. The prebuilt recipe
+keeps the XLibre and Fluxbox patches and builds without Mesa or LLVM.
+Dillo opens `file:///usr/share/emulate/index.html`.
 
 Doom uses a pinned DoomGeneric X11 build and Freedoom 0.13.0 Phase 1 data.
 Start it from Games → Doom or run `doom` in a terminal. Arrow keys move and turn,
 F/Ctrl fires, Space/E opens doors, Shift runs, and Esc opens the menu. Sound is
 disabled. Settings and saves live under `~/.local/share/doom` on the session disk.
-The `doom` build stage installs the engine and game-data licenses with their credits.
+The bundle includes the engine license; the `freedoom` stage downloads and
+verifies the game data and installs its license and credits.
 
 ## Artifacts
 

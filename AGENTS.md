@@ -84,12 +84,15 @@ lifecycle as appropriate. Node tests do not exercise real OPFS or canvas behavio
 Edit `guest/Dockerfile`, overlays, devicetrees, or checked-in patches as the source
 of truth. Keep package versions and downloaded source checksums pinned. Keep the
 guest graphics stack lightweight and retain the build's Mesa/LLVM dependency guard.
+Normal guest builds consume `guest/prebuilt/desktop.tar.gz`. After changing its
+recipe, patches, or Alpine base, run `just guest-prebuilt` and include the bundle,
+manifest, and checksums together. `bash scripts/prebuilt.sh verify` checks freshness.
 
 `just guest-rootfs` builds guest artifacts, formats the ext4 disk, publishes browser
-assets, and captures boot snapshots. It requires Docker Buildx with RISC-V
+assets, and captures boot snapshots. It requires jq, Docker Buildx with RISC-V
 emulation and a Rust toolchain. `just guest-snapshot` recaptures existing artifacts.
 Rebuild the web app after publishing guest assets when using the production preview.
-`npm run build` builds Wasm, verifies the guest artifact pairing, generates the
+`npm run build` uses Bash, jq, and shasum to build Wasm, verifies the guest artifact pairing, generates the
 asset manifest, and builds Vite. Actions publishes the heavy build as a GitHub release; Vercel downloads the
 pinned `ASSET_RELEASE` and builds the frontend remotely. See README.
 

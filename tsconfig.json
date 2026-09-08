@@ -13,7 +13,6 @@
   },
   "include": [
     "api",
-    "relay",
-    "scripts/build-site.ts"
+    "relay"
   ]
 }

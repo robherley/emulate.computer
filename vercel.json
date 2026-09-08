@@ -3,7 +3,7 @@
   "framework": "vite",
   "bunVersion": "1.x",
   "installCommand": "npm ci",
-  "buildCommand": "bun scripts/build-site.ts release",
+  "buildCommand": "bash scripts/build-site.sh release",
   "outputDirectory": "web/dist",
   "functions": {
     "api/relay.ts": {

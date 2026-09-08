@@ -7,7 +7,7 @@ changes in a file, while each browser tab gets its own temporary session disk.
 ## Building the root filesystem
 
 [guest/Dockerfile](../guest/Dockerfile) builds the RISC-V guest using pinned
-Alpine packages and checksum-verified source archives. The build exports OpenSBI,
+Alpine packages and a checked-in, checksum-verified desktop binary bundle. The build exports OpenSBI,
 the Linux kernel, a BusyBox initramfs with kernel modules, devicetrees, and
 `rootfs.tar`. Files in [guest/overlays](../guest/overlays/) are installed at their
 corresponding guest paths.
@@ -27,7 +27,12 @@ just guest-rootfs    # build guest artifacts, format ext4, publish browser asset
 just guest-snapshot # recapture from existing guest artifacts
 ```
 
-The build requires Docker Buildx with `linux/riscv64` emulation; snapshot capture
+The prebuilt bundle contains XLibre, Fluxbox, FOX/Adie/PathFinder, and the
+compiled games. `just guest-prebuilt` rebuilds it from source; changes to its
+recipe, patches, or Alpine base invalidate the manifest. Freedoom data remains
+a checksum-verified download. See [prebuilt binaries](../guest/prebuilt/README.md).
+
+The build requires jq and Docker Buildx with `linux/riscv64` emulation; snapshot capture
 also requires Rust. [build-alpine-rootfs.sh](../scripts/build-alpine-rootfs.sh)
 formats a sparse 512 MiB `guest/out/alpine-rootfs.ext4` from the tar using a pinned
 native-architecture container. Fixed ownership, timestamps, filesystem UUIDs,
@@ -38,7 +43,7 @@ The guest build writes `web/public/guest/rootfs.ext4.gz` and its uncompressed
 SHA-256 digest in `rootfs.sha256`. The disk identity is `sha256:<hash>` of the
 uncompressed ext4 image. Snapshot capture verifies that identity and embeds it.
 
-The Bun asset preparation validates the disk's size and digest, and checks that the snapshot
+The Bash asset preparation validates the disk's size and digest, and checks that the snapshot
 matches the disk and boot images. It copies public assets to the generated Vite
 public directory and names every guest artifact with the SHA-256 of its own
 served bytes, for example `rootfs.<hash>.ext4.gz` and `snapshot.<hash>.bin.gz`.
