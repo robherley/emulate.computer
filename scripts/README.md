@@ -2,7 +2,6 @@
 
 Run commands from the repository root. Stage scripts consume existing inputs;
 they do not build missing prerequisites. `just` composes stages for local use.
-CI calls the same scripts as individually named steps.
 Use `just` for project tasks; npm manages workspace dependencies with `npm ci`.
 The package manifests do not define parallel task aliases.
 
@@ -32,11 +31,11 @@ build uses this to include current icons and other public files.
 
 Formatting the disk removes the published snapshot so a stale snapshot cannot be
 shipped with a new seed. Snapshot capture uses scratch disk copies and checks the
-published disk identity. Set `EMULATE_CLI` to use a native executable downloaded
-from another CI job instead of `target/release/emulate-computer`.
+published disk identity. Set `EMULATE_CLI` to use a different native executable instead of
+`target/release/emulate-computer`.
 
 The build scripts require Bash, jq, shasum, and the repo tools in `mise.toml`.
 Guest stages also require Docker Buildx with RISC-V emulation.
 
-`release-assets.sh pack|fetch` handles the existing GitHub Release handoff.
-Packaging and deployment are separate from the local site build.
+Deploy locally using the [Vercel instructions](../docs/deployment.md).
+CI runs tests and does not publish build artifacts or deployments.

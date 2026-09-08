@@ -94,8 +94,9 @@ emulation and a Rust toolchain. `just guest-snapshot` recaptures existing artifa
 Rebuild the web app after publishing guest assets when using the production preview.
 `just build` runs: Wasm, asset preparation, and the frontend.
 `just build-all` also builds the guest disk and captures snapshots. Individual
-stages and their inputs/outputs are listed in [scripts/README.md](scripts/README.md). Actions publishes the heavy build as a GitHub release; Vercel downloads the
-pinned `ASSET_RELEASE` and builds the frontend remotely. See README.
+stages and their inputs/outputs are listed in [scripts/README.md](scripts/README.md).
+GitHub Actions runs tests only. Deploy locally with `vc build --standalone` and
+`vc deploy --prebuilt`; see [deployment](docs/deployment.md).
 
 Disk identity is `sha256:<hash>` of the uncompressed ext4 seed, published through
 `web/public/guest/rootfs.sha256`. No manual version bump is needed. Snapshot capture

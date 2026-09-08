@@ -50,11 +50,11 @@ served bytes, for example `rootfs.<hash>.ext4.gz` and `snapshot.<hash>.bin.gz`.
 The compressed-file hash is distinct from the uncompressed disk identity. A new
 snapshot therefore gets a new URL even when its disk is unchanged.
 
-The Actions release bundles these prepared files with Wasm bindings and an archive
-checksum. Vercel downloads the release selected by `ASSET_RELEASE`; it does not
-rebuild Linux, the disk, snapshots, or Wasm. Current frontend public files are
-copied from the checkout, so favicon and homepage asset edits do not need a new
-binary release. Guest homepage edits still require rebuilding the guest.
+Local builds capture snapshots, validate asset pairing, and prepare hashed assets.
+`vc build --standalone` packages the frontend and relay; `vc deploy --prebuilt`
+uploads `.vercel/output` without rebuilding the guest or frontend on Vercel.
+See [local deployment](deployment.md).
+Public files are copied from the checkout during the site build. Guest homepage edits still require rebuilding the guest.
 
 A generated manifest in `web/src/generated/guest.json` is imported into the app
 bundle. Boot uses those pinned URLs without fetching a mutable `rootfs.sha256`

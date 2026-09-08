@@ -154,3 +154,13 @@ The native transport's unit tests use local WebSocket peers to verify socket
 sharing, channel isolation, credits, bounded buffers, and reconnects. The guest
 network fixture runs concurrent HTTP fetches and a local DNS lookup through
 the Bun relay, without depending on internet access.
+
+## GitHub Actions
+
+CI runs native tests and Clippy, browser unit tests, and relay tests with an
+isolated Redis service. It also checks formatting, shell syntax, prebuilt
+freshness, and relay/API types. It does not build guest images, run ignored
+compliance/guest suites, publish artifacts, or deploy.
+
+Run `just check` after a local build for the full browser typecheck, which needs
+the generated guest manifest and Wasm bindings.

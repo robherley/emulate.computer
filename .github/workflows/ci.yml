@@ -1,0 +1,60 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Native tests and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: jdx/mise-action@v4.3.0
+      - uses: Swatinem/rust-cache@v2.9.2
+      - name: Formatting, prebuilt verification, and Clippy
+        run: bash scripts/check-project.sh
+      - name: Native tests
+        run: just test
+
+  web:
+    name: Browser unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: jdx/mise-action@v4.3.0
+      - run: npm ci
+      - run: just test-web
+
+  relay:
+    name: Relay tests and API typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: jdx/mise-action@v4.3.0
+      - run: npm ci
+      - name: Typecheck relay and API
+        run: npm exec --no -- tsc --noEmit
+      - name: Relay tests with Redis
+        run: just test-relay
+        env:
+          REDIS_URL: redis://127.0.0.1:6379

@@ -13,6 +13,7 @@ Guest and conformance suites have explicit preparation and execution commands in
 
 ## Documentation
 
+- [Deployment](docs/deployment.md): build locally and deploy to Vercel.
 - [Build stages](scripts/README.md): local commands, stage inputs, and outputs.
 
 - [Emulation](docs/emulation.md): CPU, platform devices, guest control, and performance optimizations.

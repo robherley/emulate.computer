@@ -3,7 +3,7 @@
   "framework": "vite",
   "bunVersion": "1.x",
   "installCommand": "npm ci",
-  "buildCommand": "bash scripts/release-assets.sh fetch && bash scripts/build-site.sh",
+  "buildCommand": "bash scripts/build-site.sh",
   "outputDirectory": "web/dist",
   "functions": {
     "api/relay.ts": {
@@ -65,5 +65,8 @@
         }
       ]
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": false
+  }
 }

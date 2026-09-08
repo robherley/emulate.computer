@@ -9,7 +9,8 @@
     "allowImportingTsExtensions": true,
     "types": [
       "bun"
-    ]
+    ],
+    "rewriteRelativeImportExtensions": true
   },
   "include": [
     "api",
