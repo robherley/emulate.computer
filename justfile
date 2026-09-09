@@ -126,6 +126,10 @@ guest-disk:
 site-prepare:
     bash scripts/prepare-site.sh
 
+# Publish the rootfs and snapshot to Blob and prepare deployment URLs.
+site-publish environment="production":
+    bash scripts/publish-site.sh {{environment}}
+
 # Build the frontend from prepared guest assets and Wasm.
 site:
     bash scripts/build-site.sh

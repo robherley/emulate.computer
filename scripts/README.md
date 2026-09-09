@@ -13,6 +13,7 @@ The package manifests do not define parallel task aliases.
 | Browser emulator | `just wasm` | Rust workspace | `web/src/wasm/` |
 | Snapshots | `bash scripts/capture-snapshot.sh` | Native emulator, guest boot files, disk | Console and desktop snapshots; compressed browser snapshot |
 | Prepare site | `bash scripts/prepare-site.sh` | Browser guest files and matching snapshot | Hashed assets in `web/generated-public/`, `web/src/generated/guest.json` |
+| Publish guest downloads | `just site-publish [preview\|production]` | Guest assets, pulled Blob credentials | Public rootfs/snapshot blobs and deployment manifest; removes their local output copies |
 | Site | `bash scripts/build-site.sh` | Prepared guest assets, Wasm, frontend | `web/dist/` |
 
 `just cli wasm` builds both emulator targets. `prepare-site.sh public`

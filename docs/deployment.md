@@ -18,7 +18,9 @@ vc link --project emulate-computer --scope reb-labs
 `vc` is the Vercel CLI; `vercel` works too. Activate mise before running commands.
 The relay needs `REDIS_URL` configured in Vercel for each deployment environment.
 Without it, the site loads but networking returns “Networking unavailable”.
-No GitHub deployment token or asset release setting is required.
+Connect a public Vercel Blob store to the project for guest downloads. `vc pull`
+provides its `BLOB_READ_WRITE_TOKEN` locally; it is never included in the frontend.
+The project uses the `emulate-images` store with a separate `guest/` prefix.
 
 ## Build
 
@@ -43,6 +45,7 @@ source versions or patches change, run `just guest-prebuilt` before `just build-
 
 ```sh
 vc pull --yes --environment=preview
+just site-publish preview
 vc build --standalone --target=preview
 vc deploy --prebuilt --archive=tgz --target=preview
 ```
@@ -66,12 +69,25 @@ Build again with production settings; do not reuse the preview package:
 
 ```sh
 vc pull --yes --environment=production
+just site-publish production
 vc build --standalone --target=production
 vc deploy --prebuilt --archive=tgz --target=production
 ```
 
-The deployment contains content-hashed guest files, Wasm, frontend assets, and
-the relay function. HTML revalidates; hashed assets have immutable caching.
+`site-publish` validates the guest assets, uploads the compressed rootfs and
+snapshot to public Blob URLs, and updates the generated manifest. Existing
+content-hashed blobs are reused without overwriting them. They have a one-year
+cache lifetime and are fetched directly by the browser, without a relay/function
+proxy. Blob still charges for transfer, storage, and operations.
+
+The deployment contains the smaller boot files, Wasm, frontend assets, and relay.
+The rootfs and snapshot are excluded from its static output. HTML revalidates;
+hashed static assets have immutable caching. Keep old blobs while deployed
+versions still reference them; publishing does not delete existing blobs.
+
+Run `site-publish` after `just build` and before `vc build` for every deployment.
+`just build`, `just web`, or `just site-prepare` restores local guest URLs for
+local development; `just site` preserves whichever manifest was prepared.
 
 Node is pinned by mise for tools and tests. Do not add `engines.node` to the root
 package manifest: Vercel gives it precedence over `bunVersion`, which would package

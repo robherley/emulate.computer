@@ -58,7 +58,10 @@ Public files are copied from the checkout during the site build. Guest homepage 
 
 A generated manifest in `web/src/generated/guest.json` is imported into the app
 bundle. Boot uses those pinned URLs without fetching a mutable `rootfs.sha256`
-pointer. Vercel serves `/guest/` and Vite's `/assets/` with immutable caching;
+pointer. For deployment, `just site-publish` uploads the compressed rootfs and snapshot to
+public Vercel Blob URLs with one-year caching. The browser fetches them directly;
+they are excluded from the static deployment. Local preparation keeps local URLs.
+Vercel serves the smaller `/guest/` files and Vite's `/assets/` with immutable caching;
 HTML revalidates. The raw build inputs are not copied into `web/dist`.
 The browser compares the disk identity when restoring; it does not rehash the
 streamed disk in browser memory.
