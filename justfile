@@ -128,7 +128,7 @@ site-prepare:
 
 # Publish the rootfs and snapshot to Blob and prepare deployment URLs.
 site-publish environment="production":
-    bash scripts/publish-site.sh {{environment}}
+    bash scripts/publish-site.sh {{ environment }}
 
 # Build the frontend from prepared guest assets and Wasm.
 site:
