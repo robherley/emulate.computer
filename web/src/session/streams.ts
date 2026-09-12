@@ -33,3 +33,21 @@ export async function gunzipIfNeeded(
   });
   return compressed ? raw.pipeThrough(new DecompressionStream("gzip")) : raw;
 }
+
+// Report cumulative bytes as they arrive; count before any decompression so
+// progress tracks the network transfer rather than the inflated payload.
+export function countBytes(
+  body: ReadableStream<Uint8Array<ArrayBuffer>>,
+  onBytes: (loaded: number) => void,
+): ReadableStream<Uint8Array<ArrayBuffer>> {
+  let loaded = 0;
+  return body.pipeThrough(
+    new TransformStream<Uint8Array<ArrayBuffer>, Uint8Array<ArrayBuffer>>({
+      transform(chunk, controller) {
+        loaded += chunk.byteLength;
+        onBytes(loaded);
+        controller.enqueue(chunk);
+      },
+    }),
+  );
+}

@@ -1,5 +1,5 @@
 import type { WasmMachine } from "../wasm/emulate_wasm";
-import { gunzipIfNeeded } from "./streams.ts";
+import { countBytes, gunzipIfNeeded } from "./streams.ts";
 
 const SESSION_DISK_PREFIX = "emulate-session-root-";
 const SESSION_DISK_NAME = `${SESSION_DISK_PREFIX}${crypto.randomUUID()}.img`;
@@ -12,7 +12,13 @@ export interface DiskAttachmentStatus {
   reason?: string;
 }
 
+export type DownloadProgress = (loaded: number, done: boolean) => void;
+
 export class BrowserDisk {
+  private readonly seedProgress?: DownloadProgress;
+  constructor(seedProgress?: DownloadProgress) {
+    this.seedProgress = seedProgress;
+  }
   private diskFile: FileSystemFileHandle | null = null;
   private diskClean = false;
   private diskWriteBaseline = 0;
@@ -96,11 +102,21 @@ export class BrowserDisk {
         `disk seed ${seedUrl} is unavailable (HTTP ${response.status})`,
       );
     }
-    const reader = (await gunzipIfNeeded(response.body)).getReader();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      target.seed_disk_write(value);
+    let loaded = 0;
+    this.seedProgress?.(0, false);
+    try {
+      const counted = countBytes(response.body, (bytes) => {
+        loaded = bytes;
+        this.seedProgress?.(bytes, false);
+      });
+      const reader = (await gunzipIfNeeded(counted)).getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        target.seed_disk_write(value);
+      }
+    } finally {
+      this.seedProgress?.(loaded, true);
     }
   }
 

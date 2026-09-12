@@ -274,6 +274,14 @@ export interface DiskNoticeMessage {
   message: string;
 }
 
+// Network bytes received so far for a worker-side asset download.
+export interface DownloadProgressMessage {
+  type: "download-progress";
+  asset: "disk-seed" | "snapshot";
+  loaded: number;
+  done: boolean;
+}
+
 // rows[i] identifies the framebuffer row for the i-th width-pixel run in rgba.
 export interface DisplayFrameMessage {
   type: "display-frame";
@@ -304,5 +312,6 @@ export type WorkerToMain =
   | StdoutMessage
   | StatsSampleMessage
   | DiskNoticeMessage
+  | DownloadProgressMessage
   | ShutdownMessage
   | ErrorMessage;

@@ -5,7 +5,7 @@ import { DisplayMetrics } from "./display-metrics";
 import { NetworkPort, GuestTransport } from "./network/transport";
 import { Session } from "./session/session";
 import { BrowserDisk, type DiskAttachmentStatus } from "./session/disk";
-import { gunzipIfNeeded } from "./session/streams";
+import { countBytes, gunzipIfNeeded } from "./session/streams";
 
 import init, { WasmMachine } from "./wasm/emulate_wasm.js";
 import {
@@ -17,6 +17,7 @@ import {
   TICKS_PER_MS,
   type DisplayInput,
   type BootMessage,
+  type DownloadProgressMessage,
   type EmulatorStats,
   type NetConfig,
   type ErrorMessage,
@@ -119,35 +120,40 @@ function reportFatal(
   void session.fail(new Error(`${kind}: ${context}: ${errorMessage(error)}`));
 }
 
-const session = new Session(new BrowserDisk(), {
-  create: createMachine,
-  destroy: (machine: WasmMachine) =>
-    disposeMachine(machine, "session disk close failed"),
-  started: (machine: WasmMachine) => {
-    machine.fb_mark_all_dirty();
-    checkDisplayGeometry();
-    if (displayVisible) captureDisplay();
-    session.disk.started(machine);
-    t0 = performance.now();
-    sampleInstret = 0;
-    displayFrames = 0;
-    displayMetrics.reset();
-    sampleStart = t0;
-    lastIterateAt = t0;
-    stallNotices = 0;
-    scheduleImmediate();
+const session = new Session(
+  new BrowserDisk((loaded, done) =>
+    postDownloadProgress("disk-seed", loaded, done),
+  ),
+  {
+    create: createMachine,
+    destroy: (machine: WasmMachine) =>
+      disposeMachine(machine, "session disk close failed"),
+    started: (machine: WasmMachine) => {
+      machine.fb_mark_all_dirty();
+      checkDisplayGeometry();
+      if (displayVisible) captureDisplay();
+      session.disk.started(machine);
+      t0 = performance.now();
+      sampleInstret = 0;
+      displayFrames = 0;
+      displayMetrics.reset();
+      sampleStart = t0;
+      lastIterateAt = t0;
+      stallNotices = 0;
+      scheduleImmediate();
+    },
+    pause: () => {
+      pendingPointer = null;
+      pendingPointerSentAt = undefined;
+      cancelSleep();
+      if (session.machine) session.disk.watchDiskWrites(session.machine);
+      flushStdout(true);
+    },
+    changed: (state) => post({ type: "session-state", state }),
+    error: (error) =>
+      reportIssue(issueKind(error, "runtime"), errorMessage(error), true),
   },
-  pause: () => {
-    pendingPointer = null;
-    pendingPointerSentAt = undefined;
-    cancelSleep();
-    if (session.machine) session.disk.watchDiskWrites(session.machine);
-    flushStdout(true);
-  },
-  changed: (state) => post({ type: "session-state", state }),
-  error: (error) =>
-    reportIssue(issueKind(error, "runtime"), errorMessage(error), true),
-});
+);
 
 const MAX_WEB_CRYPTO_BYTES = 65_536;
 
@@ -188,6 +194,28 @@ function disposeMachine(target: WasmMachine, context: string): void {
   }
 }
 
+// Bound progress traffic; a done message always flushes the final count.
+const DOWNLOAD_PROGRESS_INTERVAL_MS = 100;
+const downloadPostedAt: Partial<
+  Record<DownloadProgressMessage["asset"], number>
+> = {};
+
+function postDownloadProgress(
+  asset: DownloadProgressMessage["asset"],
+  loaded: number,
+  done: boolean,
+): void {
+  const now = performance.now();
+  if (
+    !done &&
+    now - (downloadPostedAt[asset] ?? -Infinity) < DOWNLOAD_PROGRESS_INTERVAL_MS
+  ) {
+    return;
+  }
+  downloadPostedAt[asset] = now;
+  post({ type: "download-progress", asset, loaded, done });
+}
+
 async function fetchSnapshot(url: string): Promise<Uint8Array | null> {
   const response = await fetch(url);
   // Vite's dev server answers missing paths with an HTML fallback.
@@ -195,14 +223,24 @@ async function fetchSnapshot(url: string): Promise<Uint8Array | null> {
   if (!response.ok || response.body === null || type.includes("text/html")) {
     return null;
   }
-  const reader = (await gunzipIfNeeded(response.body)).getReader();
+  let loaded = 0;
+  postDownloadProgress("snapshot", 0, false);
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    total += value.length;
+  try {
+    const counted = countBytes(response.body, (bytes) => {
+      loaded = bytes;
+      postDownloadProgress("snapshot", bytes, false);
+    });
+    const reader = (await gunzipIfNeeded(counted)).getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+    }
+  } finally {
+    postDownloadProgress("snapshot", loaded, true);
   }
   const container = new Uint8Array(total);
   let offset = 0;

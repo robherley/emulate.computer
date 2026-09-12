@@ -1,4 +1,5 @@
 import { subscribeColorMode } from "./color-mode";
+import { createDownloadIndicator } from "./download-progress";
 import guestAssets from "./generated/guest.json";
 import { diskSeed as manifestDiskSeed } from "./session/seed";
 import { welcomeBanner } from "./welcome";
@@ -27,6 +28,18 @@ import { GuestControl, type GuestAction, type GuestStatus } from "./session/gues
 
 const RAM_MB = DEFAULT_RAM_MB;
 const memoryLayout = guestMemoryLayout(RAM_MB);
+
+// Expected sizes and labels for the assets the worker streams itself.
+const workerDownloads = {
+  "disk-seed": {
+    label: "root filesystem",
+    bytes: guestAssets.files["rootfs.ext4.gz"].bytes,
+  },
+  snapshot: {
+    label: "boot snapshot",
+    bytes: guestAssets.files["snapshot.bin.gz"].bytes,
+  },
+} as const;
 
 const viteEnv = import.meta.env;
 const defaultRelay = viteEnv?.DEV ? undefined
@@ -163,6 +176,9 @@ export function createClient(
       if (!disposed) renderWorkerError({ kind: "boot", message: String(error), fatal: true });
     });
   }
+  const indicator = createDownloadIndicator((text) => {
+    if (!disposed) term.write(text);
+  });
   let workerReady = false;
   let bootAttempted = false;
   let bootConfigured = false;
@@ -176,6 +192,7 @@ export function createClient(
     }
     if (issue.fatal) handlers.error(issue.message);
     console.error(`[${issue.kind}] ${issue.message}`);
+    indicator.hide();
     const printable = issue.message
       .replace(/[\u0000-\u001f\u007f]+/g, " ")
       .trim();
@@ -224,8 +241,14 @@ export function createClient(
         if (benchmark) window.dispatchEvent(new CustomEvent("emulate-stats", { detail: msg.stats }));
         break;
       case "disk-notice":
+        indicator.hide();
         term.write(`\r\n\x1b[2m[${msg.message}]\x1b[0m\r\n`);
         break;
+      case "download-progress": {
+        const { label, bytes } = workerDownloads[msg.asset];
+        indicator.update(msg.asset, label, msg.loaded, bytes, msg.done);
+        break;
+      }
       case "shutdown":
         term.write(
           `\r\n\x1b[33m[machine halted, exit code ${msg.code}]\x1b[0m\r\n`,
@@ -259,16 +282,41 @@ export function createClient(
     const bytes = encoder.encode(data);
     send({ type: "stdin", data: bytes }, [bytes.buffer]);
   });
-  async function fetchBlob(path: string): Promise<ArrayBuffer | null> {
+  async function fetchBlob(
+    name: keyof typeof guestAssets.files,
+  ): Promise<ArrayBuffer | null> {
+    const file = guestAssets.files[name];
+    let loaded = 0;
+    const report = (done: boolean) =>
+      indicator.update(name, name, loaded, file.bytes, done);
     try {
-      const res = await fetch(path, { signal: downloads.signal });
+      const res = await fetch(file.url, { signal: downloads.signal });
       if (!res.ok) return null;
       // Vite's dev server can answer missing paths with an HTML fallback.
       const ct = res.headers.get("content-type") ?? "";
       if (ct.includes("text/html")) return null;
-      return await res.arrayBuffer();
+      if (!res.body) return await res.arrayBuffer();
+      report(false);
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.byteLength;
+        report(false);
+      }
+      const buffer = new Uint8Array(loaded);
+      let offset = 0;
+      for (const chunk of chunks) {
+        buffer.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      return buffer.buffer;
     } catch {
       return null;
+    } finally {
+      report(true);
     }
   }
 
@@ -293,11 +341,11 @@ export function createClient(
     bootAttempted = true;
     const [fw, kernel, initramfsDtb, rootfsDtb, initrd, diskSeed] =
       await Promise.all([
-        fetchBlob(guestAssets.files["fw.bin"].url),
-        fetchBlob(guestAssets.files["kernel.bin"].url),
-        fetchBlob(guestAssets.files["dtb.bin"].url),
-        fetchBlob(guestAssets.files["dtb-desktop.bin"].url),
-        fetchBlob(guestAssets.files["initrd.bin"].url),
+        fetchBlob("fw.bin"),
+        fetchBlob("kernel.bin"),
+        fetchBlob("dtb.bin"),
+        fetchBlob("dtb-desktop.bin"),
+        fetchBlob("initrd.bin"),
         Promise.resolve(manifestDiskSeed(guestAssets)),
       ]);
     if (disposed) return;
@@ -386,6 +434,7 @@ export function createClient(
     },
     dispose: () => {
       send({ type: "dispose" });
+      indicator.hide();
       disposed = true;
       control.reset();
       network?.dispose();
