@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 input=web/public/guest
 output=web/generated-public
-guest_files=(fw.bin kernel.bin initrd.bin dtb.bin dtb-desktop.bin dtb-rootfs.bin rootfs.ext4.gz snapshot.bin.gz)
+guest_files=(fw.bin kernel.bin.gz initrd.bin dtb.bin dtb-desktop.bin dtb-rootfs.bin rootfs.ext4.gz snapshot.bin.gz)
 
 fail() { echo "error: $*" >&2; exit 1; }
 hash() { shasum -a 256 "$1" | awk '{print $1}'; }
@@ -51,10 +51,14 @@ prepare_guest() {
     || fail "Rootfs size or checksum mismatch; run just guest-rootfs"
   rm "$work/disk"
 
-  for name in fw.bin kernel.bin initrd.bin dtb-desktop.bin; do
-    u64_prefix "$(size "$input/$name")"
-    cat "$input/$name"
+  # Identity hashes cover the bytes loaded into RAM, so the kernel is hashed
+  # decompressed even though it is published gzipped.
+  gzip -dc "$input/kernel.bin.gz" > "$work/kernel"
+  for path in "$input/fw.bin" "$work/kernel" "$input/initrd.bin" "$input/dtb-desktop.bin"; do
+    u64_prefix "$(size "$path")"
+    cat "$path"
   done > "$work/images"
+  rm "$work/kernel"
   image_hash="$(hash "$work/images")"
   disk_id="sha256:$disk_hash"
   gzip -dc "$input/snapshot.bin.gz" > "$work/snapshot"

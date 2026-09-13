@@ -1,5 +1,6 @@
 import { subscribeColorMode } from "./color-mode";
 import { createDownloadIndicator } from "./download-progress";
+import { countBytes, gunzipIfNeeded } from "./session/streams";
 import guestAssets from "./generated/guest.json";
 import { diskSeed as manifestDiskSeed } from "./session/seed";
 import { welcomeBanner } from "./welcome";
@@ -282,10 +283,15 @@ export function createClient(
     const bytes = encoder.encode(data);
     send({ type: "stdin", data: bytes }, [bytes.buffer]);
   });
+  // A `.gz` manifest name means the published file is compressed and inflates
+  // here. Assets whose loaded form is itself gzip data keep a plain name (the
+  // initrd the kernel unpacks at boot), so the name, not the response headers,
+  // decides.
   async function fetchBlob(
     name: keyof typeof guestAssets.files,
   ): Promise<ArrayBuffer | null> {
     const file = guestAssets.files[name];
+    const inflate = name.endsWith(".gz");
     let loaded = 0;
     const report = (done: boolean) =>
       indicator.update(name, name, loaded, file.bytes, done);
@@ -297,16 +303,23 @@ export function createClient(
       if (ct.includes("text/html")) return null;
       if (!res.body) return await res.arrayBuffer();
       report(false);
-      const reader = res.body.getReader();
+      // Progress counts network bytes, before any decompression.
+      const counted = countBytes(res.body, (bytes) => {
+        loaded = bytes;
+        report(false);
+      });
+      const reader = (
+        inflate ? await gunzipIfNeeded(counted) : counted
+      ).getReader();
       const chunks: Uint8Array[] = [];
+      let total = 0;
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         chunks.push(value);
-        loaded += value.byteLength;
-        report(false);
+        total += value.byteLength;
       }
-      const buffer = new Uint8Array(loaded);
+      const buffer = new Uint8Array(total);
       let offset = 0;
       for (const chunk of chunks) {
         buffer.set(chunk, offset);
@@ -342,7 +355,7 @@ export function createClient(
     const [fw, kernel, initramfsDtb, rootfsDtb, initrd, diskSeed] =
       await Promise.all([
         fetchBlob("fw.bin"),
-        fetchBlob("kernel.bin"),
+        fetchBlob("kernel.bin.gz"),
         fetchBlob("dtb.bin"),
         fetchBlob("dtb-desktop.bin"),
         fetchBlob("initrd.bin"),
@@ -358,7 +371,7 @@ export function createClient(
         : undefined;
     const missing: string[] = [];
     if (!fw) missing.push("fw.bin");
-    if (!kernel) missing.push("kernel.bin");
+    if (!kernel) missing.push("kernel.bin.gz");
     if (!dtb) missing.push("dtb.bin");
     if (!useRootfs)
       missing.push("desktop root filesystem (run just guest-rootfs)");

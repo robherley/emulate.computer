@@ -124,9 +124,17 @@ fn capture_onto(
     }
     let boot_seconds = started.elapsed().as_secs_f64();
 
-    // Flush the page cache back to the disk, then drop everything clean. The
-    // second `sync` covers the writeback `drop_caches` itself triggers.
-    guest.shell("sync; echo 3 > /proc/sys/vm/drop_caches; sync");
+    // Drop the page cache, then zero the freed pages by filling 7/8 of
+    // MemAvailable (kB * 896) through a temporarily uncapped tmpfs and
+    // deleting it, so stale cache contents do not ride along as non-zero pages.
+    guest.shell(
+        "sync; echo 3 > /proc/sys/vm/drop_caches; \
+         mount -o remount,size=100% /dev/shm; \
+         head -c $(($(awk '/MemAvailable/{print $2}' /proc/meminfo) * 896)) \
+         /dev/zero > /dev/shm/balloon 2>/dev/null; \
+         rm -f /dev/shm/balloon; mount -o remount,size=50% /dev/shm; \
+         echo 3 > /proc/sys/vm/drop_caches; sync",
+    );
     guest
         .run_until(PROMPT, COMMAND_BUDGET)
         .map_err(|why| why.to_string())?;

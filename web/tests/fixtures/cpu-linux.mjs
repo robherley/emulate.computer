@@ -2,19 +2,19 @@ import guestAssets from "../../src/generated/guest.json";
 import { imageIdentityHash, DISK_LOGICAL_BYTES, DEFAULT_RAM_MB } from '../../src/protocol.ts';
 import { gunzipIfNeeded } from '../../src/session/streams.ts';
 
-async function fetchBytes(url, compressed = false) {
+async function fetchBytes(name) {
+  const url = guestAssets.files[name].url;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  const body = compressed ? await gunzipIfNeeded(response.body) : response.body;
+  const body = name.endsWith('.gz') ? await gunzipIfNeeded(response.body) : response.body;
   return new Uint8Array(await new Response(body).arrayBuffer());
 }
 
 export async function linuxBenchmark(WasmMachine, samples, progress) {
   progress('Loading guest images');
-  const images = await Promise.all(['fw.bin', 'kernel.bin', 'initrd.bin', 'dtb-desktop.bin']
-    .map(name => fetchBytes(guestAssets.files[name].url)));
+  const images = await Promise.all(['fw.bin', 'kernel.bin.gz', 'initrd.bin', 'dtb-desktop.bin'].map(fetchBytes));
   const hash = new Uint8Array(await imageIdentityHash(images.map(bytes => bytes.buffer)));
-  const snapshot = await fetchBytes(guestAssets.files['snapshot.bin.gz'].url, true);
+  const snapshot = await fetchBytes('snapshot.bin.gz');
   const header = new DataView(snapshot.buffer);
   const diskIdLength = header.getUint32(50, true);
   const diskId = new TextDecoder().decode(snapshot.subarray(54, 54 + diskIdLength));

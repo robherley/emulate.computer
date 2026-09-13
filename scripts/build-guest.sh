@@ -48,10 +48,11 @@ for artifact in fw.bin Image initramfs.cpio.gz virt.dtb virt-rootfs.dtb virt-des
 done
 
 mkdir -p web/public/guest
-cp guest/out/Image web/public/guest/kernel.bin
+rm -f web/public/guest/kernel.bin
+gzip -9 -n -c guest/out/Image > web/public/guest/kernel.bin.gz
 cp guest/out/virt.dtb web/public/guest/dtb.bin
 cp guest/out/virt-rootfs.dtb web/public/guest/dtb-rootfs.bin
 cp guest/out/virt-desktop.dtb web/public/guest/dtb-desktop.bin
 cp guest/out/initramfs.cpio.gz web/public/guest/initrd.bin
 cp guest/out/fw.bin web/public/guest/fw.bin
-echo 'installed: web/public/guest/{fw,kernel,dtb,dtb-rootfs,dtb-desktop,initrd}.bin'
+echo 'installed: web/public/guest/{fw,dtb,dtb-rootfs,dtb-desktop,initrd}.bin and kernel.bin.gz'
