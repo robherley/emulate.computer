@@ -22,33 +22,21 @@ Connect a public Vercel Blob store to the project for guest downloads. `vc pull`
 provides its `BLOB_READ_WRITE_TOKEN` locally; it is never included in the frontend.
 The project uses the `emulate-images` store with a separate `guest/` prefix.
 
-## Build
-
-For the first build, or after guest changes:
+## Deploy
 
 ```sh
-just build-all
-just check
+just deploy        # preview
+just deploy --prod # production
 ```
 
-For emulator or frontend changes with an existing guest disk and snapshot:
+Both commands build Wasm and the frontend, run project checks and web tests,
+pull the selected Vercel environment, publish guest downloads to Blob, package
+the site and relay, and deploy. Any failed step stops the deployment.
 
-```sh
-just build
-just check
-```
-
-See [build stages](../scripts/README.md) for individual commands. If desktop
-source versions or patches change, run `just guest-prebuilt` before `just build-all`.
-
-## Preview
-
-```sh
-vc pull --yes --environment=preview
-just site-publish preview
-vc build --standalone --target=preview
-vc deploy --prebuilt --archive=tgz --target=preview
-```
+They use the existing guest disk and snapshot. For the first build or after guest
+changes, run `just guest-rootfs` first. If desktop source versions or patches
+change, run `just guest-prebuilt` before that.
+See [build stages](../scripts/README.md) for individual commands.
 
 `vc build` rebuilds the frontend and packages the relay using the prepared guest
 assets and Wasm. `--standalone` includes function dependencies in the output.
@@ -63,16 +51,7 @@ before deploying production. `vc curl / --deployment <url> -- --head` works with
 protected previews. Networking requires a working Redis connection, not just a
 successful function build.
 
-## Production
-
-Build again with production settings; do not reuse the preview package:
-
-```sh
-vc pull --yes --environment=production
-just site-publish production
-vc build --standalone --target=production
-vc deploy --prebuilt --archive=tgz --target=production
-```
+## Assets and packaging
 
 `site-publish` validates the guest assets, uploads the compressed rootfs and
 snapshot to public Blob URLs, and updates the generated manifest. Existing
@@ -85,7 +64,7 @@ The rootfs and snapshot are excluded from its static output. HTML revalidates;
 hashed static assets have immutable caching. Keep old blobs while deployed
 versions still reference them; publishing does not delete existing blobs.
 
-Run `site-publish` after `just build` and before `vc build` for every deployment.
+`just deploy` runs `site-publish` after the local build and before `vc build`.
 `just build`, `just web`, or `just site-prepare` restores local guest URLs for
 local development; `just site` preserves whichever manifest was prepared.
 

@@ -22,6 +22,8 @@ build uses this to include current icons and other public files.
 
 ## Local commands
 
+- `just deploy`: build, check, publish guest downloads to Blob, and deploy a Vercel preview; use `just deploy --prod` for production.
+
 - `just build`: rebuild Wasm, prepare assets, and build the site using the existing guest disk and snapshot.
 - `just build-all`: also rebuild guest files, format the disk, and capture snapshots.
 - `just guest-rootfs`: guest files, native CLI, disk, and snapshots, without the web build.

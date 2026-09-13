@@ -140,6 +140,14 @@ build: wasm site-prepare site
 # Build the guest, snapshots, Wasm, and frontend from source.
 build-all: guest-rootfs build
 
+# Build, check, and deploy to preview; pass --prod for production.
+[arg("environment", long="prod", value="production")]
+deploy environment="preview": build check test-web
+    vc pull --yes --environment="$1"
+    just site-publish "$1"
+    vc build --standalone --target="$1"
+    vc deploy --prebuilt --archive=tgz --target="$1"
+
 # Production build of the browser application, including Wasm.
 web-build: build
 
