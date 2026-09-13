@@ -5,6 +5,7 @@ import { DisplayMetrics } from "./display-metrics";
 import { NetworkPort, GuestTransport } from "./network/transport";
 import { Session } from "./session/session";
 import { BrowserDisk, type DiskAttachmentStatus } from "./session/disk";
+import { RunLoopWatchdog } from "./session/watchdog";
 import { countBytes, gunzipIfNeeded } from "./session/streams";
 
 import init, { WasmMachine } from "./wasm/emulate_wasm.js";
@@ -138,7 +139,7 @@ const session = new Session(
       displayFrames = 0;
       displayMetrics.reset();
       sampleStart = t0;
-      lastIterateAt = t0;
+      watchdog.reset(t0);
       stallNotices = 0;
       scheduleImmediate();
     },
@@ -690,12 +691,10 @@ function advanceHostTime(target: WasmMachine, now: number): void {
   target.advance_mtime_from_host(hostTicks);
 }
 
-// Allow for timer clamping before treating a missing iteration as a lost wake-up.
-const WATCHDOG_STALL_MS = 2_000;
 const WATCHDOG_INTERVAL_MS = 1_000;
 const MAX_STALL_NOTICES = 3;
 
-let lastIterateAt = 0;
+const watchdog = new RunLoopWatchdog();
 let stallNotices = 0;
 let unknownStatusReported = false;
 
@@ -724,7 +723,7 @@ function wake(): void {
 function iterate(): void {
   const machine = session.machine;
   if (!machine) return;
-  lastIterateAt = performance.now();
+  watchdog.progressed(performance.now());
   cancelSleep();
 
   advanceHostTime(machine, performance.now());
@@ -801,12 +800,12 @@ function iterate(): void {
 
 setInterval(() => {
   if (session.state !== "running") return;
-  if (performance.now() - lastIterateAt < WATCHDOG_STALL_MS) return;
-  if (stallNotices < MAX_STALL_NOTICES) {
+  const health = watchdog.check(performance.now());
+  if (health === "healthy") return;
+  if (health === "stalled" && stallNotices < MAX_STALL_NOTICES) {
     stallNotices += 1;
     reportIssue("runtime", "emulator run loop stalled; resuming", false);
   }
-  lastIterateAt = performance.now();
   wake();
 }, WATCHDOG_INTERVAL_MS);
 
