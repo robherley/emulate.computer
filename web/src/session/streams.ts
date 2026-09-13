@@ -1,3 +1,5 @@
+const GZIP_INPUT_CHUNK_BYTES = 16 * 1024;
+
 // Sniff gzip magic: browsers may already have decompressed Content-Encoding: gzip.
 export async function gunzipIfNeeded(
   body: ReadableStream<Uint8Array<ArrayBuffer>>,
@@ -10,7 +12,7 @@ export async function gunzipIfNeeded(
     const { done, value } = await source.read();
     if (done) {
       ended = true;
-    } else {
+    } else if (value.length > 0) {
       head.push(value);
       peeked += value.length;
     }
@@ -19,18 +21,37 @@ export async function gunzipIfNeeded(
     head.length > 0 &&
     head[0][0] === 0x1f &&
     (head[0][1] ?? head[1]?.[0]) === 0x8b;
+  let pending: Uint8Array<ArrayBuffer> | undefined;
+  let offset = 0;
   const raw = new ReadableStream<Uint8Array<ArrayBuffer>>({
-    start(controller) {
-      for (const chunk of head) controller.enqueue(chunk);
-      if (ended) controller.close();
-    },
     async pull(controller) {
-      const { done, value } = await source.read();
-      if (done) controller.close();
-      else controller.enqueue(value);
+      while (!pending) {
+        pending = head.shift();
+        if (!pending) {
+          if (ended) {
+            controller.close();
+            source.releaseLock();
+            return;
+          }
+          const { done, value } = await source.read();
+          ended = done;
+          if (value?.length) pending = value;
+        }
+        offset = 0;
+      }
+      const end = compressed
+        ? Math.min(offset + GZIP_INPUT_CHUNK_BYTES, pending.length)
+        : pending.length;
+      controller.enqueue(pending.subarray(offset, end));
+      offset = end;
+      if (offset === pending.length) pending = undefined;
     },
-    cancel: (reason) => source.cancel(reason),
-  });
+    cancel(reason) {
+      pending = undefined;
+      head.length = 0;
+      return source.cancel(reason).finally(() => source.releaseLock());
+    },
+  }, { highWaterMark: 0 });
   return compressed ? raw.pipeThrough(new DecompressionStream("gzip")) : raw;
 }
 

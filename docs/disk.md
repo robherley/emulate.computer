@@ -103,6 +103,12 @@ capacity, but zero 4 KiB blocks are skipped while seeding. Disk contents stay
 outside Wasm linear memory. The synchronous handle allows a VirtIO request to
 finish within the worker's execution of its queue notification.
 
+Gzip downloads feed the browser decompressor at most 16 KiB of compressed data
+per chunk, with backpressure between chunks. WebKit buffers each input chunk's
+entire inflated output; bounding the input avoids large temporary allocations
+when decompressing the disk's zero-filled space. The same streaming helper
+handles the compressed kernel and snapshot.
+
 Tabs do not share disks. Restart retains the current tab's OPFS disk; Reset
 removes it and seeds a fresh one. A normal page close requests cleanup. Since
 close handlers are not guaranteed to run, later visits remove abandoned managed
