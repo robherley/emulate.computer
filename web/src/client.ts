@@ -179,7 +179,7 @@ export function createClient(
   }
   const indicator = createDownloadIndicator((text) => {
     if (!disposed) term.write(text);
-  });
+  }, () => term.cols);
   let workerReady = false;
   let bootAttempted = false;
   let bootConfigured = false;

@@ -4,6 +4,8 @@
 
 const SHOW_DELAY_MS = 250;
 const RENDER_INTERVAL_MS = 100;
+const BAR_WIDTH = 12;
+const SPINNER = ["|", "/", "-", "\\"];
 
 interface DownloadEntry {
   label: string;
@@ -26,8 +28,22 @@ export interface DownloadIndicator {
 
 const mb = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(1);
 
+function progressBar(
+  loaded: number,
+  total: number | undefined,
+  marker: string,
+): string {
+  if (total === undefined || total <= 0) {
+    return `[${marker}${".".repeat(BAR_WIDTH - 1)}]`;
+  }
+  const filled = Math.floor(Math.min(loaded / total, 1) * BAR_WIDTH);
+  if (filled === BAR_WIDTH) return `[${"=".repeat(BAR_WIDTH)}]`;
+  return `[${"=".repeat(filled)}${marker}${".".repeat(BAR_WIDTH - filled - 1)}]`;
+}
+
 export function createDownloadIndicator(
   write: (text: string) => void,
+  columns: () => number = () => Infinity,
 ): DownloadIndicator {
   // Entries accumulate within one burst of downloads so concurrent fetches
   // aggregate; a download starting after a fully finished burst begins fresh.
@@ -36,6 +52,7 @@ export function createDownloadIndicator(
   let showTimer: ReturnType<typeof setTimeout> | null = null;
   let renderTimer: ReturnType<typeof setTimeout> | null = null;
   let lastRender = -Infinity;
+  let spinnerFrame = 0;
 
   function allDone(): boolean {
     for (const entry of entries.values()) if (!entry.done) return false;
@@ -55,19 +72,37 @@ export function createDownloadIndicator(
     }
     const label = active.length === 1 ? active[0] : "guest images";
     // A proxy may re-encode a download, so received bytes can pass the total.
-    const amount =
+    const percentage =
       totalKnown && total > 0
-        ? `${mb(Math.min(loaded, total))}/${mb(total)} MB (${Math.min(
-            Math.round((loaded / total) * 100),
-            100,
-          )}%)`
-        : `${mb(loaded)} MB`;
-    return `\r\x1b[K\x1b[2m[downloading ${label}: ${amount}]\x1b[0m`;
+        ? `${Math.min(Math.round((loaded / total) * 100), 100)}%`
+        : undefined;
+    const amount = percentage
+      ? `${mb(Math.min(loaded, total))}/${mb(total)} MB (${percentage})`
+      : `${mb(loaded)} MB`;
+    const bar = progressBar(
+      loaded,
+      totalKnown ? total : undefined,
+      SPINNER[spinnerFrame % SPINNER.length],
+    );
+    const candidates = [
+      `${bar} downloading ${label}: ${amount}`,
+      `${bar} ${label}: ${amount}`,
+      `${bar} ${amount}`,
+      percentage ? `${bar} ${percentage}` : bar,
+      percentage ?? amount,
+    ];
+    // Leave the final column unused so xterm never enters its wrapped state.
+    const width = Math.max(columns() - 1, 1);
+    const content =
+      candidates.find((candidate) => candidate.length <= width) ??
+      candidates.at(-1)!.slice(0, width);
+    return `\r\x1b[K\x1b[2m${content}\x1b[0m`;
   }
 
   function render(): void {
     lastRender = performance.now();
     write(line());
+    spinnerFrame++;
   }
 
   function scheduleRender(): void {
@@ -80,6 +115,7 @@ export function createDownloadIndicator(
     renderTimer = setTimeout(() => {
       renderTimer = null;
       render();
+      scheduleRender();
     }, wait);
   }
 
@@ -94,7 +130,8 @@ export function createDownloadIndicator(
     }
     if (visible) {
       visible = false;
-      write("\r\x1b[K");
+      // Remove both the indicator and the spacer row it reserved on first draw.
+      write("\r\x1b[K\x1b[1A\r\x1b[K");
     }
   }
 
@@ -110,7 +147,10 @@ export function createDownloadIndicator(
         showTimer = setTimeout(() => {
           showTimer = null;
           visible = true;
+          // Keep one empty row between the welcome message and boot activity.
+          write("\r\n");
           render();
+          scheduleRender();
         }, SHOW_DELAY_MS);
       }
       scheduleRender();
